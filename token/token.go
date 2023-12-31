@@ -31,6 +31,7 @@ const (
 	LE       = "<="
 	GE       = ">="
 	INC      = "++"
+	DEC      = "--"
 
 	// Delimiters
 	COMMA     = ","

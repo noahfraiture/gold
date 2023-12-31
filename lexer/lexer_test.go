@@ -29,6 +29,7 @@ if (5 < 10) {
 5.3 >= 5.2;
 for a != b {
 	a++;
+	b--;
 }
 `
 
@@ -120,6 +121,9 @@ for a != b {
 		{token.LBRACE, "{"},
 		{token.IDENT, "a"},
 		{token.INC, "++"},
+		{token.SEMICOLON, ";"},
+		{token.IDENT, "b"},
+		{token.DEC, "--"},
 		{token.SEMICOLON, ";"},
 		{token.RBRACE, "}"},
 		{token.EOF, ""},

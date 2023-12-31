@@ -136,6 +136,21 @@ func (il *IntegerLiteral) String() string {
 	return il.Token.Literal
 }
 
+type FloatLiteral struct {
+	Token token.Token
+	Value float64
+}
+
+func (fl *FloatLiteral) expressionNode() {}
+
+func (fl *FloatLiteral) TokenLiteral() string {
+	return fl.Token.Literal
+}
+
+func (fl *FloatLiteral) String() string {
+	return fl.Token.Literal
+}
+
 type PrefixExpression struct {
 	Token    token.Token
 	Operator string
@@ -176,6 +191,27 @@ func (oe *InfixExpression) String() string {
 	out.WriteString(oe.Left.String())
 	out.WriteString(" " + oe.Operator + " ")
 	out.WriteString(oe.Right.String())
+	out.WriteString(")")
+	return out.String()
+}
+
+type PostfixExpression struct {
+	Left     Expression
+	Token    token.Token
+	Operator string
+}
+
+func (pe *PostfixExpression) expressionNode() {}
+
+func (pe *PostfixExpression) TokenLiteral() string {
+	return pe.Token.Literal
+}
+
+func (pe *PostfixExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("(")
+	out.WriteString(pe.Left.String())
+	out.WriteString(pe.Operator)
 	out.WriteString(")")
 	return out.String()
 }
@@ -288,5 +324,26 @@ func (ce *CallExpression) String() string {
 	out.WriteString("(")
 	out.WriteString(strings.Join(args, ", "))
 	out.WriteString(")")
+	return out.String()
+}
+
+// ForExpression NOTE : for now, the for expression will behave like a while statement.
+// I will add the possibility to make a classic for loop with init, condition, iteration and range
+type ForExpression struct {
+	Token       token.Token
+	Condition   Expression
+	Consequence *BlockStatement
+}
+
+func (fe *ForExpression) expressionNode() {}
+
+func (fe *ForExpression) TokenLiteral() string { return fe.Token.Literal }
+
+func (fe *ForExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("for")
+	out.WriteString(fe.Condition.String())
+	out.WriteString(" ")
+	out.WriteString(fe.Consequence.String())
 	return out.String()
 }

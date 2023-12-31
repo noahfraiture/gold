@@ -9,6 +9,8 @@ I will modify this language to my please, which also will be noted in the change
 
 ## Monkey base
 
+Every change has been tested
+
 ### Lexer and tokens
 
 Here's what I added in the lexer and tokens
@@ -16,3 +18,12 @@ Here's what I added in the lexer and tokens
 - '<=' and '>='
 - FLOAT are different token than INT
 - FOR token
+
+### Parser and AST
+
+I adapted the things added in the lexer for the parser, so
+- '<=' and '>='
+- FLOAT are well parse
+- FOR is basically the same thing than IF for now. Like if it requires parenthesis, it won't stay like that. Also 
+  it's actually a while
+- '++' as postfix
