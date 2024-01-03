@@ -35,6 +35,94 @@ func TestEvalIntegerExpression(t *testing.T) {
 	}
 }
 
+func TestEvalFloatExpression(t *testing.T) {
+	tests := []struct {
+		input    string
+		excepted float64
+	}{
+		{"5.0", 5.0},
+		{"10.0", 10.0},
+		{"-5.0", -5.0},
+		{"-10.0", -10.0},
+		{"5.0 + 5.0 + 5.0 + 5.0 - 10.0", 10.0},
+		{"2.0 * 2.0 * 2.0 * 2.0 * 2.0", 32.0},
+		{"-50.0 + 100.0 + -50.0", 0.0},
+		{"5.0 * 2.0 + 10.0", 20.0},
+		{"5.0 + 2.0 * 10.0", 25.0},
+		{"20.0 + 2.0 * -10.0", 0.0},
+		{"50.0 / 2.0 * 2.0 + 10.0", 60.0},
+		{"2.0 * (5.0 + 10.0)", 30.0},
+		{"3.0 * 3.0 * 3.0 + 10.0", 37.0},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testFloatObject(t, evaluated, tt.excepted)
+	}
+}
+
+func TestEvalMixedNumberExpression(t *testing.T) {
+	tests := []struct {
+		input    string
+		excepted float64
+	}{
+		{"5.0 + 5 + 5.0 + 5.0 - 10", 10.0},
+		{"2.0 * 2.0 * 2.0 * 2.0 * 2.0", 32.0},
+		{"-50 + 100.0 + -50.0", 0.0},
+		{"5.0 * 2.0 + 10.0", 20.0},
+		{"5 + 2 * 10.0", 25.0},
+		{"20 + 2.0 * -10.0", 0.0},
+		{"50.0 / 2.0 * 2 + 10.0", 60.0},
+		{"2.0 * (5 + 10)", 30.0},
+		{"3 * 3 * 3.0 + 10.0", 37.0},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testFloatObject(t, evaluated, tt.excepted)
+	}
+}
+
+func TestUnaryExpression(t *testing.T) {
+	testsInteger := []struct {
+		input    string
+		expected int64
+	}{
+		{"let i = 0; i++", 0},
+		{"let i = 0; i++; i", 1},
+		{"let i = 5; i++; i++; i", 7},
+		{"let i = 5; i++; i++", 6},
+		{"let i = 0; i--", 0},
+		{"let i = 0; i--; i", -1},
+		{"let i = 5; i--; i--; i", 3},
+		{"let i = 5; i--; i--", 4},
+	}
+
+	for _, tt := range testsInteger {
+		evaluated := testEval(tt.input)
+		testIntegerObject(t, evaluated, tt.expected)
+	}
+
+	testsFloat := []struct {
+		input    string
+		expected float64
+	}{
+		{"let i = 0.1; i++", 0.1},
+		{"let i = 0.2; i++; i", 1.2},
+		{"let i = 5.3; i++; i++; i", 7.3},
+		{"let i = 5.4; i++; i++", 6.4},
+		{"let i = 0.5; i--", 0.5},
+		{"let i = 0.6; i--; i", -0.4},
+		{"let i = 5.7; i--; i--; i", 3.7},
+		{"let i = 5.8; i--; i--", 4.8},
+	}
+
+	for _, tt := range testsFloat {
+		evaluated := testEval(tt.input)
+		testFloatObject(t, evaluated, tt.expected)
+	}
+}
+
 func TestEvalBooleanExpression(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -98,6 +186,28 @@ func TestIfElseExpressions(t *testing.T) {
 		{"if (1 > 2) { 10 }", nil},
 		{"if (1 > 2) { 10 } else { 20 }", 20},
 		{"if (1 < 2) { 10 } else { 20 }", 10},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		integer, ok := tt.expected.(int)
+		if ok {
+			testIntegerObject(t, evaluated, int64(integer))
+		} else {
+			testNullObject(t, evaluated)
+		}
+	}
+}
+
+func TestForExpressions(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{"let i = 0; for (i < 10) { i++; } i", 10},
+		{"let i = 0; for (i < 10) { i++; }", nil},
+		{"let i = 0; for (false) { i++; }", nil},
+		{"let i = 10; for (i) { i-- } i", 0},
 	}
 
 	for _, tt := range tests {
@@ -325,6 +435,20 @@ func testIntegerObject(t *testing.T, obj object.Object, expected int64) bool {
 		return false
 	}
 
+	return true
+}
+
+func testFloatObject(t *testing.T, obj object.Object, expected float64) bool {
+	result, ok := obj.(*object.Float)
+	if !ok {
+		t.Errorf("object is not Float. got=%T (%+v)", obj, obj)
+		return false
+	}
+	if result.Value != expected {
+		t.Errorf("object has wrong value. got=%f, want=%f",
+			result.Value, expected)
+		return false
+	}
 	return true
 }
 

@@ -46,6 +46,12 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 			return right
 		}
 		return evalPrefixExpression(node.Operator, right)
+	case *ast.PostfixExpression:
+		left := Eval(node.Left, env)
+		if isError(left) {
+			return left
+		}
+		return evalPostfixExpression(node, env)
 	case *ast.InfixExpression:
 		left := Eval(node.Left, env)
 		if isError(left) {
@@ -58,12 +64,16 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		return evalInfixExpression(node.Operator, left, right)
 	case *ast.IntegerLiteral:
 		return &object.Integer{Value: node.Value}
+	case *ast.FloatLiteral:
+		return &object.Float{Value: node.Value}
 	case *ast.Boolean:
 		return nativeBoolToBooleanObject(node.Value) // singleton
 	case *ast.BlockStatement:
 		return evalBlockStatement(node, env)
 	case *ast.IfExpression:
 		return evalIfExpression(node, env)
+	case *ast.ForExpression:
+		return evalForExpression(node, env)
 	case *ast.ReturnStatement:
 		val := Eval(node.ReturnValue, env)
 		if isError(val) {
@@ -95,12 +105,35 @@ func evalIfExpression(ie *ast.IfExpression, env *object.Environment) object.Obje
 	}
 }
 
+func evalForExpression(fe *ast.ForExpression, env *object.Environment) object.Object {
+	condition := Eval(fe.Condition, env)
+	if isError(condition) {
+		return condition
+	}
+	for isTruthy(condition) {
+		Eval(fe.Consequence, env)
+		condition = Eval(fe.Condition, env)
+		if isError(condition) {
+			return condition
+		}
+	}
+	return NULL
+	// NOTE : is returning null the best solution ? I could return the condition but it would necessary be false
+}
+
 func isTruthy(obj object.Object) bool {
-	switch obj {
-	case NULL, FALSE:
+	// NOTE : maybe not the better solution if I gotta do that for every type. Could use a default value singleton or flag
+	switch obj := obj.(type) {
+	case *object.Null:
 		return false
+	case *object.Boolean:
+		return obj.Value
+	case *object.Integer:
+		return obj.Value != 0
+	case *object.Float:
+		return obj.Value != 0
 	default:
-		return true
+		return false
 	}
 }
 
@@ -115,12 +148,46 @@ func evalPrefixExpression(operator string, right object.Object) object.Object {
 	}
 }
 
-func evalMinusPrefixOperatorExpression(right object.Object) object.Object {
-	if right.Type() != object.INTEGER_OBJ {
-		return newError("unknown operator: -%s", right.Type())
+func evalPostfixExpression(node *ast.PostfixExpression, env *object.Environment) object.Object {
+	switch node.Operator {
+	case "++":
+		return evalUnaryPostfixExpression(node.Left.String(), env, 1) // String is the value of the identifier token
+	case "--":
+		return evalUnaryPostfixExpression(node.Left.String(), env, -1)
+	default:
+		return newError("unknown operator: %s", node.Operator)
 	}
-	value := right.(*object.Integer).Value
-	return &object.Integer{Value: -value}
+}
+
+func evalUnaryPostfixExpression(identifier string, env *object.Environment, add int64) object.Object {
+	value, ok := env.Get(identifier)
+	if !ok {
+		return newError("identifier not found: " + identifier)
+	}
+	switch value := value.(type) {
+	case *object.Integer:
+		env.Set(identifier, &object.Integer{Value: value.Value + add})
+		return &object.Integer{Value: value.Value}
+	case *object.Float:
+		env.Set(identifier, &object.Float{Value: value.Value + float64(add)})
+		return &object.Float{Value: value.Value}
+	default:
+		return newError("can't increment type: %s", value.Type())
+	}
+}
+
+func evalMinusPrefixOperatorExpression(right object.Object) object.Object {
+	switch right.Type() {
+	case object.INTEGER_OBJ:
+		value := right.(*object.Integer).Value
+		return &object.Integer{Value: -value}
+	case object.FLOAT_OBJ:
+		value := right.(*object.Float).Value
+		return &object.Float{Value: -value}
+	default:
+		return newError("unknown operator: -%s", right.Type())
+
+	}
 }
 
 func evalBangOperatorExpression(right object.Object) object.Object {
@@ -139,6 +206,14 @@ func evalInfixExpression(
 	switch {
 	case left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ:
 		return evalIntegerInfixExpression(operator, left, right)
+	case left.Type() == object.FLOAT_OBJ && right.Type() == object.FLOAT_OBJ:
+		return evalFloatInfixExpression(operator, left, right)
+	case left.Type() == object.FLOAT_OBJ && right.Type() == object.INTEGER_OBJ:
+		rightValue := &object.Float{Value: float64(right.(*object.Integer).Value)}
+		return evalInfixExpression(operator, left, rightValue)
+	case left.Type() == object.INTEGER_OBJ && right.Type() == object.FLOAT_OBJ:
+		leftValue := &object.Float{Value: float64(left.(*object.Integer).Value)}
+		return evalInfixExpression(operator, leftValue, right)
 
 	// Pointer comparison for bool
 	// The order of switch is important
@@ -150,6 +225,40 @@ func evalInfixExpression(
 	case left.Type() != right.Type():
 		return newError("type mismatch: %s %s %s",
 			left.Type(), operator, right.Type())
+	default:
+		return newError("unknown operator: %s %s %s",
+			left.Type(), operator, right.Type())
+	}
+}
+
+// NOTE : duplicate function for float
+func evalFloatInfixExpression(
+	operator string,
+	left, right object.Object,
+) object.Object {
+	leftVal := left.(*object.Float).Value
+	rightVal := right.(*object.Float).Value
+	switch operator {
+	case "+":
+		return &object.Float{Value: leftVal + rightVal}
+	case "-":
+		return &object.Float{Value: leftVal - rightVal}
+	case "*":
+		return &object.Float{Value: leftVal * rightVal}
+	case "/":
+		return &object.Float{Value: leftVal / rightVal}
+	case "<":
+		return nativeBoolToBooleanObject(leftVal < rightVal)
+	case ">":
+		return nativeBoolToBooleanObject(leftVal > rightVal)
+	case "<=":
+		return nativeBoolToBooleanObject(leftVal <= rightVal)
+	case ">=":
+		return nativeBoolToBooleanObject(leftVal >= rightVal)
+	case "==":
+		return nativeBoolToBooleanObject(leftVal == rightVal)
+	case "!=":
+		return nativeBoolToBooleanObject(leftVal != rightVal)
 	default:
 		return newError("unknown operator: %s %s %s",
 			left.Type(), operator, right.Type())
