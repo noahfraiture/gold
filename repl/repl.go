@@ -3,7 +3,9 @@ package repl
 import (
 	"bufio"
 	"fmt"
+	"gold/evaluator"
 	"gold/lexer"
+	"gold/object"
 	"gold/parser"
 	"io"
 )
@@ -12,6 +14,7 @@ const PROMPT = ">> "
 
 func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
+	env := object.NewEnvironment()
 
 	for {
 		fmt.Printf(PROMPT)
@@ -30,8 +33,11 @@ func Start(in io.Reader, out io.Writer) {
 			continue
 		}
 
-		io.WriteString(out, program.String()+"\n")
-		io.WriteString(out, "\n")
+		evaluated := evaluator.Eval(program, env)
+		if evaluated != nil {
+			io.WriteString(out, evaluated.Inspect())
+			io.WriteString(out, "\n")
+		}
 	}
 }
 
