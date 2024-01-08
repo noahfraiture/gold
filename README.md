@@ -53,3 +53,5 @@ Like before I adapted the next thing in the evaluator with the following behavio
 - non null value
 - ? debug info
 - db in runtime
+- weird name (trex)
+- let is pouf
