@@ -20,6 +20,6 @@
 # Go workspace file
 go.work
 example
+old
 .idea
 
-wiki.md

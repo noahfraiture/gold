@@ -34,6 +34,30 @@ func TestIntegerArithmetic(t *testing.T) {
 	runVmTests(t, tests)
 }
 
+func TestFloatArithmetic(t *testing.T) {
+	tests := []vmTestCase{
+		{"1.0", 1.0},
+		{"2.5", 2.5},
+		{"1.0 + 2", 3.0},
+		{"1 - 2.5", -1.5},
+		{"1.5 * 2.0", 3.0},
+		{"4.0 / 2.0", 2.0},
+		{"50.0 / 2 * 2.5 + 10 - 5", 67.5},
+		{"5.5 * (2 + 10)", 66.0},
+		{"5.0 + 5 + 5 + 5 - 10", 10.0},
+		{"2 * 2 * 2 * 2.0 * 2", 32.0},
+		{"5.0 * 2 + 10", 20.0},
+		{"5 + 2.5 * 10", 30.0},
+		{"5.0 * (2.5 + 10)", 62.5},
+		{"-5.0", -5.0},
+		{"-10.", -10.0},
+		{"-50.0 + 100 + -50.5", -0.5},
+		{"(5.0 + 10 * 2.5 + 15 / 3.0) * 2 + -10", 60.0},
+	}
+
+	runVmTests(t, tests)
+}
+
 func TestBooleanExpressions(t *testing.T) {
 	tests := []vmTestCase{
 		{"true", true},
@@ -46,6 +70,14 @@ func TestBooleanExpressions(t *testing.T) {
 		{"1 != 1", false},
 		{"1 == 2", false},
 		{"1 != 2", true},
+		{"1.1 < 2.2", true},
+		{"1.1 > 2.2", false},
+		{"1.1 < 1.1", false},
+		{"1.1 > 1.1", false},
+		{"1.1 == 1.1", true},
+		{"1.1 != 1.1", false},
+		{"1.1 == 2.2", false},
+		{"1.1 != 2.2", true},
 		{"true == true", true},
 		{"false == false", true},
 		{"true == false", false},
@@ -58,6 +90,7 @@ func TestBooleanExpressions(t *testing.T) {
 		{"!true", false},
 		{"!false", true},
 		{"!5", false},
+		{"!2.3", false},
 		{"!!true", true},
 		{"!!false", false},
 		{"!!5", true},
@@ -104,6 +137,7 @@ func TestStringExpressions(t *testing.T) {
 	runVmTests(t, tests)
 }
 
+// TODO : ensure array can have everything
 func TestArrayLiterals(t *testing.T) {
 	tests := []vmTestCase{
 		{"[]", []int{}},
@@ -668,6 +702,12 @@ func testExpectedObject(
 			t.Errorf("testIntegerObject failed: %s", err)
 		}
 
+	case float64:
+		err := testFloatObject(float64(expected), actual)
+		if err != nil {
+			t.Errorf("testFloatObject failed: %s", err)
+		}
+
 	case bool:
 		err := testBooleanObject(bool(expected), actual)
 		if err != nil {
@@ -752,6 +792,21 @@ func testIntegerObject(expected int64, actual object.Object) error {
 
 	if result.Value != expected {
 		return fmt.Errorf("object has wrong value. got=%d, want=%d",
+			result.Value, expected)
+	}
+
+	return nil
+}
+
+func testFloatObject(expected float64, actual object.Object) error {
+	result, ok := actual.(*object.Float)
+	if !ok {
+		return fmt.Errorf("object is not Float. got=%T (%+v)",
+			actual, actual)
+	}
+
+	if result.Value != expected {
+		return fmt.Errorf("object has wrong value. got=%f, want=%f",
 			result.Value, expected)
 	}
 

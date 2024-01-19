@@ -307,82 +307,40 @@ func (vm *VM) executeBinaryOperation(op code.Opcode) error {
 	leftType := left.Type()
 	rightType := right.Type()
 
-	switch {
-	case leftType == object.INTEGER_OBJ && rightType == object.INTEGER_OBJ:
-		return vm.executeBinaryIntegerOperation(op, left, right)
-	case leftType == object.FLOAT_OBJ && rightType == object.FLOAT_OBJ:
-		return vm.executeBinaryFloatOperation(op, left, right)
-	case leftType == object.FLOAT_OBJ && rightType == object.INTEGER_OBJ:
-		return vm.executeBinaryFloatIntegerOperation(op, left, right)
-	case leftType == object.INTEGER_OBJ && rightType == object.FLOAT_OBJ:
-		return vm.executeBinaryIntegerFloatOperation(op, left, right)
-	case leftType == object.STRING_OBJ && rightType == object.STRING_OBJ:
+	if leftType == object.INTEGER_OBJ && rightType == object.INTEGER_OBJ {
+		value, err := executeBinaryNumberOperation[int64](op, left.(*object.Integer).Value, right.(*object.Integer).Value)
+		if err != nil {
+			return err
+		}
+		return vm.push(&object.Integer{Value: value})
+	}
+
+	leftIsNumber := leftType == object.INTEGER_OBJ || leftType == object.FLOAT_OBJ
+	rightIsNumber := rightType == object.INTEGER_OBJ || rightType == object.FLOAT_OBJ
+	if leftIsNumber && rightIsNumber {
+		leftValue, err := getFloat64(left)
+		if err != nil {
+			return err
+		}
+
+		rightValue, err := getFloat64(right)
+		if err != nil {
+			return err
+		}
+
+		value, err := executeBinaryNumberOperation[float64](op, leftValue, rightValue)
+		if err != nil {
+			return err
+		}
+		return vm.push(&object.Float{Value: value})
+	}
+
+	if leftType == object.STRING_OBJ && rightType == object.STRING_OBJ {
 		return vm.executeBinaryStringOperation(op, left, right)
-	default:
-		return fmt.Errorf("unsupported types for binary operation: %s %s",
-			leftType, rightType)
-	}
-}
-
-// TODO : 4 functions very similar
-func (vm *VM) executeBinaryFloatIntegerOperation(
-	op code.Opcode,
-	left, right object.Object,
-) error {
-	leftValue := float64(left.(*object.Integer).Value)
-	rightValue := right.(*object.Float).Value
-
-	result, err := executeBinaryNumberOperation(op, leftValue, rightValue)
-	if err != nil {
-		return err
 	}
 
-	return vm.push(&object.Float{Value: result})
-}
-
-func (vm *VM) executeBinaryIntegerFloatOperation(
-	op code.Opcode,
-	left, right object.Object,
-) error {
-	leftValue := left.(*object.Float).Value
-	rightValue := float64(right.(*object.Integer).Value)
-
-	result, err := executeBinaryNumberOperation(op, leftValue, rightValue)
-	if err != nil {
-		return err
-	}
-
-	return vm.push(&object.Float{Value: result})
-}
-
-func (vm *VM) executeBinaryFloatOperation(
-	op code.Opcode,
-	left, right object.Object,
-) error {
-	leftValue := left.(*object.Float).Value
-	rightValue := right.(*object.Float).Value
-
-	result, err := executeBinaryNumberOperation(op, leftValue, rightValue)
-	if err != nil {
-		return err
-	}
-
-	return vm.push(&object.Float{Value: result})
-}
-
-func (vm *VM) executeBinaryIntegerOperation(
-	op code.Opcode,
-	left, right object.Object,
-) error {
-	leftValue := left.(*object.Integer).Value
-	rightValue := right.(*object.Integer).Value
-
-	result, err := executeBinaryNumberOperation(op, leftValue, rightValue)
-	if err != nil {
-		return err
-	}
-
-	return vm.push(&object.Integer{Value: result})
+	return fmt.Errorf("unsupported types for binary operation: %s %s",
+		leftType, rightType)
 }
 
 func executeBinaryNumberOperation[N int64 | float64](op code.Opcode, leftValue, rightValue N) (N, error) {
@@ -408,21 +366,45 @@ func (vm *VM) executeComparison(op code.Opcode) error {
 	right := vm.pop()
 	left := vm.pop()
 
-	var value *object.Boolean
-	var err error
+	if left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ {
+		value, err := executeNumberComparison[int64](op, left.(*object.Integer).Value, right.(*object.Integer).Value)
+		if err != nil {
+			return err
+		}
+		return vm.push(value)
+	}
 
 	leftIsNumber := left.Type() == object.INTEGER_OBJ || left.Type() == object.FLOAT_OBJ
 	rightIsNumber := right.Type() == object.INTEGER_OBJ || right.Type() == object.FLOAT_OBJ
 	if leftIsNumber && rightIsNumber {
-		value, err = executeNumberComparison(op, left.(*object.Integer).Value, right.(*object.Integer).Value)
+		leftValue, err := getFloat64(left)
+		if err != nil {
+			return err
+		}
+		rightValue, err := getFloat64(right)
+		if err != nil {
+			return err
+		}
+
+		value, err := executeNumberComparison[float64](op, leftValue, rightValue)
+		if err != nil {
+			return err
+		}
+		return vm.push(value)
 	}
 
-	if err != nil {
-		return err
+	switch op {
+	case code.OpEqual:
+		return vm.push(nativeBoolToBooleanObject(right == left))
+	case code.OpNotEqual:
+		return vm.push(nativeBoolToBooleanObject(right != left))
+	default:
+		return fmt.Errorf("unknown operator : %d (%s %s)",
+			op, left.Type(), right.Type())
 	}
-	return vm.push(value)
 }
 
+// Cannot be a method since methods don't accept type parameter
 func executeNumberComparison[C int64 | float64](
 	op code.Opcode,
 	left, right C,
@@ -433,7 +415,7 @@ func executeNumberComparison[C int64 | float64](
 	case code.OpNotEqual:
 		return nativeBoolToBooleanObject(right != left), nil
 	case code.OpGreaterThan:
-		return nativeBoolToBooleanObject(left < right), nil
+		return nativeBoolToBooleanObject(left > right), nil
 	default:
 		return nil, fmt.Errorf("unknown operator: %d", op)
 	}
@@ -457,12 +439,16 @@ func (vm *VM) executeBangOperator() error {
 func (vm *VM) executeMinusOperator() error {
 	operand := vm.pop()
 
-	if operand.Type() != object.INTEGER_OBJ {
+	switch operand.Type() {
+	case object.INTEGER_OBJ:
+		value := operand.(*object.Integer).Value
+		return vm.push(&object.Integer{Value: -value})
+	case object.FLOAT_OBJ:
+		value := operand.(*object.Float).Value
+		return vm.push(&object.Float{Value: -value})
+	default:
 		return fmt.Errorf("unsupported type for negation: %s", operand.Type())
 	}
-
-	value := operand.(*object.Integer).Value
-	return vm.push(&object.Integer{Value: -value})
 }
 
 func (vm *VM) executeBinaryStringOperation(
@@ -645,4 +631,14 @@ func isTruthy(obj object.Object) bool {
 	default:
 		return true
 	}
+}
+
+func getFloat64(obj object.Object) (float64, error) {
+	if obj.Type() == object.FLOAT_OBJ {
+		return obj.(*object.Float).Value, nil
+	}
+	if obj.Type() == object.INTEGER_OBJ {
+		return float64(obj.(*object.Integer).Value), nil
+	}
+	return 0, fmt.Errorf("unsupported type for comparison: %s", obj.Type())
 }

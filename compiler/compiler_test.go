@@ -74,7 +74,7 @@ func TestCompilerScopes(t *testing.T) {
 	}
 }
 
-func TestIntegerArithmetic(t *testing.T) {
+func TestNumberArithmetic(t *testing.T) {
 	tests := []compilerTestCase{
 		{
 			input:             "1 + 2",
@@ -117,8 +117,8 @@ func TestIntegerArithmetic(t *testing.T) {
 			},
 		},
 		{
-			input:             "5.0 - 2.5",
-			expectedConstants: []interface{}{5.0, 2.5},
+			input:             "5.0 - 2.",
+			expectedConstants: []interface{}{5.0, 2.0},
 			expectedInstructions: []code.Instructions{
 				code.Make(code.OpConstant, 0),
 				code.Make(code.OpConstant, 1),
@@ -180,8 +180,8 @@ func TestBooleanExpressions(t *testing.T) {
 			},
 		},
 		{
-			input:             "1.8 < 2.3",
-			expectedConstants: []interface{}{2.3, 1.8},
+			input:             "1.8 < 2",
+			expectedConstants: []interface{}{2, 1.8},
 			expectedInstructions: []code.Instructions{
 				code.Make(code.OpConstant, 0),
 				code.Make(code.OpConstant, 1),
@@ -473,8 +473,8 @@ func TestArrayLiterals(t *testing.T) {
 			},
 		},
 		{
-			input:             "[1, 2, 3]",
-			expectedConstants: []interface{}{1, 2, 3},
+			input:             "[1, 2, 3.2]",
+			expectedConstants: []interface{}{1, 2, 3.2},
 			expectedInstructions: []code.Instructions{
 				code.Make(code.OpConstant, 0),
 				code.Make(code.OpConstant, 1),
@@ -505,7 +505,7 @@ func TestArrayLiterals(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
-// TODO : complete for floats
+// TODO : complete for floats and strings
 func TestHashLiterals(t *testing.T) {
 	tests := []compilerTestCase{
 		{
