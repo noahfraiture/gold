@@ -1,9 +1,8 @@
 package lexer
 
 import (
-	"testing"
-
 	"gold/token"
+	"testing"
 )
 
 func TestNextToken(t *testing.T) {
@@ -28,17 +27,14 @@ if (5 < 10) {
 10 != 9;
 "foobar"
 "foo bar"
-5.3 >= 5.2;
-for a != b {
-	a++;
-	b--;
-}
 [1, 2];
 {"foo": "bar"}
+5.5
+3.
 `
 
 	tests := []struct {
-		expectedType    token.Type
+		expectedType    token.TokenType
 		expectedLiteral string
 	}{
 		{token.LET, "let"},
@@ -116,22 +112,6 @@ for a != b {
 		{token.SEMICOLON, ";"},
 		{token.STRING, "foobar"},
 		{token.STRING, "foo bar"},
-		{token.FLOAT, "5.3"},
-		{token.GE, ">="},
-		{token.FLOAT, "5.2"},
-		{token.SEMICOLON, ";"},
-		{token.FOR, "for"},
-		{token.IDENT, "a"},
-		{token.NOT_EQ, "!="},
-		{token.IDENT, "b"},
-		{token.LBRACE, "{"},
-		{token.IDENT, "a"},
-		{token.INC, "++"},
-		{token.SEMICOLON, ";"},
-		{token.IDENT, "b"},
-		{token.DEC, "--"},
-		{token.SEMICOLON, ";"},
-		{token.RBRACE, "}"},
 		{token.LBRACKET, "["},
 		{token.INT, "1"},
 		{token.COMMA, ","},
@@ -143,7 +123,9 @@ for a != b {
 		{token.COLON, ":"},
 		{token.STRING, "bar"},
 		{token.RBRACE, "}"},
-		{token.EOF, ""}, // NOTE : why here but not in other place
+		{token.FLOAT, "5.5"},
+		{token.FLOAT, "3."},
+		{token.EOF, ""},
 	}
 
 	l := New(input)

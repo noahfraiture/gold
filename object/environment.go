@@ -1,10 +1,5 @@
 package object
 
-type Environment struct {
-	outer *Environment
-	store map[string]Object
-}
-
 func NewEnclosedEnvironment(outer *Environment) *Environment {
 	env := NewEnvironment()
 	env.outer = outer
@@ -14,6 +9,11 @@ func NewEnclosedEnvironment(outer *Environment) *Environment {
 func NewEnvironment() *Environment {
 	s := make(map[string]Object)
 	return &Environment{store: s, outer: nil}
+}
+
+type Environment struct {
+	store map[string]Object
+	outer *Environment
 }
 
 func (e *Environment) Get(name string) (Object, bool) {
