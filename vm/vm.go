@@ -104,7 +104,7 @@ func (vm *VM) Run() error {
 				return err
 			}
 
-		case code.OpEqual, code.OpNotEqual, code.OpGreaterThan:
+		case code.OpEqual, code.OpNotEqual, code.OpGreaterThan, code.OpGreaterEqualThan:
 			err := vm.executeComparison(op)
 			if err != nil {
 				return err
@@ -416,6 +416,8 @@ func executeNumberComparison[C int64 | float64](
 		return nativeBoolToBooleanObject(right != left), nil
 	case code.OpGreaterThan:
 		return nativeBoolToBooleanObject(left > right), nil
+	case code.OpGreaterEqualThan:
+		return nativeBoolToBooleanObject(left >= right), nil
 	default:
 		return nil, fmt.Errorf("unknown operator: %d", op)
 	}

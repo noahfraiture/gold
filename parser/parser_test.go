@@ -224,6 +224,8 @@ func TestParsingInfixExpressions(t *testing.T) {
 		{"5 / 5;", 5, "/", 5},
 		{"5 > 5;", 5, ">", 5},
 		{"5 < 5;", 5, "<", 5},
+		{"5 >= 5;", 5, ">=", 5},
+		{"5 <= 5;", 5, "<=", 5},
 		{"5 == 5;", 5, "==", 5},
 		{"5 != 5;", 5, "!=", 5},
 		{"foobar + barfoo;", "foobar", "+", "barfoo"},
@@ -232,6 +234,8 @@ func TestParsingInfixExpressions(t *testing.T) {
 		{"foobar / barfoo;", "foobar", "/", "barfoo"},
 		{"foobar > barfoo;", "foobar", ">", "barfoo"},
 		{"foobar < barfoo;", "foobar", "<", "barfoo"},
+		{"foobar >= barfoo;", "foobar", ">=", "barfoo"},
+		{"foobar <= barfoo;", "foobar", "<=", "barfoo"},
 		{"foobar == barfoo;", "foobar", "==", "barfoo"},
 		{"foobar != barfoo;", "foobar", "!=", "barfoo"},
 		{"true == true", true, "==", true},
@@ -311,6 +315,14 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 		{
 			"5 < 4 != 3 > 4",
 			"((5 < 4) != (3 > 4))",
+		},
+		{
+			"5 >= 4 == 3 <= 4",
+			"((5 >= 4) == (3 <= 4))",
+		},
+		{
+			"5 <= 4 != 3 >= 4",
+			"((5 <= 4) != (3 >= 4))",
 		},
 		{
 			"3 + 4 * 5 == 3 * 1 + 4 * 5",

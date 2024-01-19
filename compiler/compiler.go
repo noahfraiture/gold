@@ -67,7 +67,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 	case *ast.InfixExpression:
 		// This separate case reverse the order of right and left. With that we can use the same opCode for < and >
-		if node.Operator == "<" {
+		if node.Operator == "<" || node.Operator == "<=" {
 			err := c.Compile(node.Right)
 			if err != nil {
 				return err
@@ -77,7 +77,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 			if err != nil {
 				return err
 			}
-			c.emit(code.OpGreaterThan)
+			if node.Operator == "<" {
+				c.emit(code.OpGreaterThan)
+			} else {
+				c.emit(code.OpGreaterEqualThan)
+			}
 			return nil
 		}
 
@@ -102,6 +106,8 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpDiv)
 		case ">":
 			c.emit(code.OpGreaterThan)
+		case ">=":
+			c.emit(code.OpGreaterEqualThan)
 		case "==":
 			c.emit(code.OpEqual)
 		case "!=":

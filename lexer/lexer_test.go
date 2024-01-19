@@ -23,6 +23,8 @@ if (5 < 10) {
 	return false;
 }
 
+3.4 <= 6 >= 2;
+
 10 == 10;
 10 != 9;
 "foobar"
@@ -102,6 +104,12 @@ if (5 < 10) {
 		{token.FALSE, "false"},
 		{token.SEMICOLON, ";"},
 		{token.RBRACE, "}"},
+		{token.FLOAT, "3.4"},
+		{token.LE, "<="},
+		{token.INT, "6"},
+		{token.GE, ">="},
+		{token.INT, "2"},
+		{token.SEMICOLON, ";"},
 		{token.INT, "10"},
 		{token.EQ, "=="},
 		{token.INT, "10"},
