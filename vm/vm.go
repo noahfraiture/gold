@@ -425,16 +425,10 @@ func executeNumberComparison[C int64 | float64](
 
 func (vm *VM) executeBangOperator() error {
 	operand := vm.pop()
-
-	switch operand {
-	case True:
+	if isTruthy(operand) {
 		return vm.push(False)
-	case False:
+	} else {
 		return vm.push(True)
-	case Null:
-		return vm.push(True)
-	default:
-		return vm.push(False)
 	}
 }
 
@@ -629,6 +623,12 @@ func isTruthy(obj object.Object) bool {
 
 	case *object.Null:
 		return false
+
+	case *object.Integer:
+		return obj.Value != 0
+
+	case *object.Float:
+		return obj.Value != 0
 
 	default:
 		return true

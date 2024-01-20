@@ -99,9 +99,12 @@ func TestBooleanExpressions(t *testing.T) {
 		{"!false", true},
 		{"!5", false},
 		{"!2.3", false},
+		{"!!0", false},
+		{"!!0.0", false},
 		{"!!true", true},
 		{"!!false", false},
 		{"!!5", true},
+		{"!!5.", true},
 		{"!(if (false) { 5; })", true},
 	}
 
