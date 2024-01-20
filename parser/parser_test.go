@@ -388,6 +388,22 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"add(a * b[2], b[1], 2 * [1, 2][1])",
 			"add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
 		},
+		{
+			"x++ < 5",
+			"((x++) < 5)",
+		},
+		{
+			"x++ - 5",
+			"((x++) - 5)",
+		},
+		{
+			"++x * 5",
+			"((++x) * 5)",
+		},
+		{
+			"--x++ - 5",
+			"((--(x++)) - 5)", // NOTE : not really what I could want, but it's pretty random
+		},
 	}
 
 	for _, tt := range tests {

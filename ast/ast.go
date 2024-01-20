@@ -201,6 +201,40 @@ func (oe *InfixExpression) String() string {
 	return out.String()
 }
 
+type IncPostExpression struct {
+	Left     Expression
+	Token    token.Token
+	Operator string
+}
+
+func (pe *IncPostExpression) expressionNode()      {}
+func (pe *IncPostExpression) TokenLiteral() string { return pe.Token.Literal }
+func (pe *IncPostExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("(")
+	out.WriteString(pe.Left.String())
+	out.WriteString(pe.Operator)
+	out.WriteString(")")
+	return out.String()
+}
+
+type IncPreExpression struct {
+	Right    Expression
+	Token    token.Token
+	Operator string
+}
+
+func (pe *IncPreExpression) expressionNode()      {}
+func (pe *IncPreExpression) TokenLiteral() string { return pe.Token.Literal }
+func (pe *IncPreExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("(")
+	out.WriteString(pe.Operator)
+	out.WriteString(pe.Right.String())
+	out.WriteString(")")
+	return out.String()
+}
+
 type IfExpression struct {
 	Condition   Expression
 	Consequence *BlockStatement

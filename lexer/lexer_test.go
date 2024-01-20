@@ -33,6 +33,8 @@ if (5 < 10) {
 {"foo": "bar"}
 5.5
 3.
+x++
+--x--
 `
 
 	tests := []struct {
@@ -133,6 +135,11 @@ if (5 < 10) {
 		{token.RBRACE, "}"},
 		{token.FLOAT, "5.5"},
 		{token.FLOAT, "3."},
+		{token.IDENT, "x"},
+		{token.INC, "++"},
+		{token.DEC, "--"},
+		{token.IDENT, "x"},
+		{token.DEC, "--"},
 		{token.EOF, ""},
 	}
 

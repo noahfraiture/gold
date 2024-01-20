@@ -12,6 +12,9 @@ const (
 	FLOAT  = "FLOAT"
 	STRING = "STRING" // "foobar"
 
+	INC = "++"
+	DEC = "--"
+
 	// Operators
 	ASSIGN   = "="
 	PLUS     = "+"
