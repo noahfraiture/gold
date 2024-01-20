@@ -151,6 +151,65 @@ func TestNumberArithmetic(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestVariablesInc(t *testing.T) {
+	tests := []compilerTestCase{
+		{
+			input:             "let x = 0; x++",
+			expectedConstants: []interface{}{0},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpInc), // NOTE : could use add opcode but more costly
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input:             "let x = 0; x--",
+			expectedConstants: []interface{}{0},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpDec),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input:             "let x = 0; ++x",
+			expectedConstants: []interface{}{0},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpInc),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input:             "let x = 0; --x",
+			expectedConstants: []interface{}{0},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpDec),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpPop),
+			},
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
 func TestBooleanExpressions(t *testing.T) {
 	tests := []compilerTestCase{
 		{

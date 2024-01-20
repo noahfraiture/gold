@@ -225,7 +225,7 @@ func (oe *InfixExpression) String() string {
 }
 
 type IncPostExpression struct {
-	Left     Expression
+	Left     *Identifier
 	Token    token.Token
 	Operator string
 }
@@ -242,7 +242,7 @@ func (pe *IncPostExpression) String() string {
 }
 
 type IncPreExpression struct {
-	Right    Expression
+	Right    *Identifier
 	Token    token.Token
 	Operator string
 }

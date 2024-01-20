@@ -128,6 +128,21 @@ func TestConditionals(t *testing.T) {
 	runVmTests(t, tests)
 }
 
+func TestIncDecExpressions(t *testing.T) {
+	tests := []vmTestCase{
+		{"let x = 0; x++", 0},
+		{"let x = 0; x--", 0},
+		{"let x = 0; x++; x", 1},
+		{"let x = 0; x--; x", -1},
+		{"let x = 0; ++x", 1},
+		{"let x = 0; --x", -1},
+		{"let x = 0; ++x; x", 1},
+		{"let x = 0; --x; x", -1},
+	}
+
+	runVmTests(t, tests)
+}
+
 func TestGlobalLetStatements(t *testing.T) {
 	tests := []vmTestCase{
 		{"let one = 1; one", 1},

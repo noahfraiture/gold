@@ -125,6 +125,71 @@ func (c *Compiler) Compile(node ast.Node) error {
 		float := &object.Float{Value: node.Value}
 		c.emit(code.OpConstant, c.addConstant(float))
 
+	case *ast.IncPostExpression:
+		// Compile twice to have two OpGet to still have one after modification
+		symbol, ok := c.symbolTable.Resolve(node.Left.Value)
+		if !ok {
+			return nil
+		}
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpGetGlobal, symbol.Index)
+			c.emit(code.OpGetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpGetLocal, symbol.Index)
+			c.emit(code.OpGetLocal, symbol.Index)
+		}
+
+		switch node.Operator {
+		case "++":
+			c.emit(code.OpInc)
+		case "--":
+			c.emit(code.OpDec)
+		default:
+			return fmt.Errorf("unknown operator %s", node.Operator)
+		}
+
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpSetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
+		}
+
+	case *ast.IncPreExpression:
+		// NOTE : could need less code and let OpInc do everything to limit the bytecode
+		// The problem is to choose global or local
+
+		// Compile twice to have two OpGet to still have one after modification
+		symbol, ok := c.symbolTable.Resolve(node.Right.Value)
+		if !ok {
+			return nil
+		}
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpGetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpGetLocal, symbol.Index)
+		}
+
+		switch node.Operator {
+		case "++":
+			c.emit(code.OpInc)
+		case "--":
+			c.emit(code.OpDec)
+		default:
+			return fmt.Errorf("unknown operator %s", node.Operator)
+		}
+
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpSetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
+		}
+
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpGetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpGetLocal, symbol.Index)
+		}
+
 	case *ast.Boolean:
 		if node.Value { // True and False aren't in constant pool, there are separate object in VM
 			c.emit(code.OpTrue)

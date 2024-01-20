@@ -289,12 +289,17 @@ func (p *Parser) parseStringLiteral() ast.Expression {
 // === PARSE POSTFIX ===
 
 func (p *Parser) parseIncPostfixExpression() ast.Expression {
+	if p.curToken.Type != token.IDENT {
+		return nil
+	}
+	identifier := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	p.nextToken()
+
 	expression := &ast.IncPostExpression{
 		Token:    p.curToken,
-		Left:     p.parseIdentifier(), // TODO : check error
-		Operator: p.peekToken.Literal,
+		Operator: p.curToken.Literal,
+		Left:     identifier,
 	}
-	p.nextToken() // consome '++'
 	return expression
 }
 
@@ -353,8 +358,14 @@ func (p *Parser) parseIncPrefixExpression() ast.Expression {
 		Token:    p.curToken,
 		Operator: p.curToken.Literal,
 	}
-	p.nextToken()
-	expression.Right = p.parseExpression(INCDEC)
+
+	p.nextToken() // consome '++' or '--'
+
+	if p.curToken.Type != token.IDENT {
+		return nil
+	}
+	identifier := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	expression.Right = identifier
 	return expression
 }
 

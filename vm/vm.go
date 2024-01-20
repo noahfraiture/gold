@@ -92,6 +92,12 @@ func (vm *VM) Run() error {
 				return err
 			}
 
+		case code.OpInc, code.OpDec:
+			err := vm.executeIncDecOperation(op)
+			if err != nil {
+				return err
+			}
+
 		case code.OpTrue:
 			err := vm.push(True)
 			if err != nil {
@@ -341,6 +347,25 @@ func (vm *VM) executeBinaryOperation(op code.Opcode) error {
 
 	return fmt.Errorf("unsupported types for binary operation: %s %s",
 		leftType, rightType)
+}
+
+func (vm *VM) executeIncDecOperation(op code.Opcode) error {
+	var increaseValue int
+	if op == code.OpInc {
+		increaseValue = 1
+	} else {
+		increaseValue = -1
+	}
+
+	value := vm.pop()
+	switch value := value.(type) {
+	case *object.Integer:
+		return vm.push(&object.Integer{Value: value.Value + int64(increaseValue)})
+	case *object.Float:
+		return vm.push(&object.Float{Value: value.Value + float64(increaseValue)})
+	default:
+		return fmt.Errorf("unsupported type for inc/dec: %s", value.Type())
+	}
 }
 
 func executeBinaryNumberOperation[N int64 | float64](op code.Opcode, leftValue, rightValue N) (N, error) {

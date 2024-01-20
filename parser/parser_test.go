@@ -434,10 +434,7 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"++x * 5",
 			"((++x) * 5)",
 		},
-		{
-			"--x++ - 5",
-			"((--(x++)) - 5)", // NOTE : not really what I could want, but it's pretty random
-		},
+		// TODO : There was previously a test with --x++ but that doesn't make that much sense. Can correct later
 	}
 
 	for _, tt := range tests {
