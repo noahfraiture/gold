@@ -367,6 +367,43 @@ func TestGlobalLetStatements(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestGlobalReassign(t *testing.T) {
+	tests := []compilerTestCase{
+		{
+			input: `
+      let one = 0;
+      one = 1;
+      `,
+			expectedConstants: []interface{}{0, 1},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpConstant, 1),
+				code.Make(code.OpSetGlobal, 0),
+			},
+		},
+		{
+			// TODO : even when use same constant, get different OpConstant code, could need opti
+			input: `
+      let one = 1;
+      let two = 2;
+      one = 3;
+      `,
+			expectedConstants: []interface{}{1, 2, 3},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpConstant, 1),
+				code.Make(code.OpSetGlobal, 1),
+				code.Make(code.OpConstant, 2),
+				code.Make(code.OpSetGlobal, 0),
+			},
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
 func TestFunctions(t *testing.T) {
 	tests := []compilerTestCase{
 		{

@@ -120,6 +120,10 @@ func (p *Parser) ParseProgram() *ast.Program {
 }
 
 func (p *Parser) parseStatement() ast.Statement {
+	if p.peekToken.Type == token.ASSIGN {
+		return p.parseReassignStatement()
+	}
+
 	switch p.curToken.Type {
 	case token.LET:
 		return p.parseLetStatement()
@@ -132,6 +136,7 @@ func (p *Parser) parseStatement() ast.Statement {
 
 // === PARSE STATEMENTS ===
 
+// TODO : refactor to use less space
 func (p *Parser) parseLetStatement() *ast.LetStatement {
 	stmt := &ast.LetStatement{Token: p.curToken}
 
@@ -144,6 +149,32 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	if !p.expectPeek(token.ASSIGN) {
 		return nil
 	}
+
+	p.nextToken()
+
+	stmt.Value = p.parseExpression(LOWEST)
+
+	// TODO : what is fl ?
+	// next function also
+	if fl, ok := stmt.Value.(*ast.FunctionLiteral); ok {
+		fl.Name = stmt.Name.Value
+	}
+
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseReassignStatement() *ast.ReassignStatement {
+	identifier := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	stmt := &ast.ReassignStatement{Name: identifier}
+
+	if !p.expectPeek(token.ASSIGN) {
+		return nil
+	}
+	stmt.Token = p.curToken
 
 	p.nextToken()
 

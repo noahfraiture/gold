@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"errors"
 	"fmt"
 	"gold/ast"
 	"gold/code"
@@ -196,6 +197,22 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 	case *ast.LetStatement:
 		symbol := c.symbolTable.Define(node.Name.Value)
+		err := c.Compile(node.Value)
+		if err != nil {
+			return err
+		}
+
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpSetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
+		}
+
+	case *ast.ReassignStatement:
+		symbol, ok := c.symbolTable.Resolve(node.Name.Value)
+		if !ok {
+			return errors.New("undefined variable " + node.Name.Value)
+		}
 		err := c.Compile(node.Value)
 		if err != nil {
 			return err

@@ -138,6 +138,16 @@ func TestGlobalLetStatements(t *testing.T) {
 	runVmTests(t, tests)
 }
 
+func TestGlobalReassignStatements(t *testing.T) {
+	tests := []vmTestCase{
+		{"let one = 1; one = 2; one", 2},
+		{"let one = 1; let two = 2; one = one + two; one", 3},
+		{"let one = 1; one = one + one; one + one", 4},
+	}
+
+	runVmTests(t, tests)
+}
+
 func TestStringExpressions(t *testing.T) {
 	tests := []vmTestCase{
 		{`"gold"`, "gold"},
