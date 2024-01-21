@@ -35,6 +35,9 @@ if (5 < 10) {
 3.
 x++
 --x--
+while (true) {
+  x++
+}
 `
 
 	tests := []struct {
@@ -140,6 +143,14 @@ x++
 		{token.DEC, "--"},
 		{token.IDENT, "x"},
 		{token.DEC, "--"},
+		{token.WHILE, "while"},
+		{token.LPAREN, "("},
+		{token.TRUE, "true"},
+		{token.RPAREN, ")"},
+		{token.LBRACE, "{"},
+		{token.IDENT, "x"},
+		{token.INC, "++"},
+		{token.RBRACE, "}"},
 		{token.EOF, ""},
 	}
 

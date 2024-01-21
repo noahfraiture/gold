@@ -249,6 +249,28 @@ func (c *Compiler) Compile(node ast.Node) error {
 		afterAlternativePos := len(c.currentInstructions()) + 1 // The  + 1 is necessary to jump after the pop that will be generated for the IfExpression
 		c.changeOperand(jumpPos, afterAlternativePos)
 
+	case *ast.WhileExpression:
+		pos := len(c.currentInstructions())
+
+		err := c.Compile(node.Condition)
+		if err != nil {
+			return err
+		}
+
+		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
+
+		err = c.Compile(node.Consequence)
+		if err != nil {
+			return nil
+		}
+
+		c.emit(code.OpJump, pos)
+
+		afterConsequencePos := len(c.currentInstructions())
+		c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
+
+		c.emit(code.OpNull) // NOTE : since it's an expression, must produce a value
+
 	case *ast.BlockStatement:
 		for _, s := range node.Statements {
 			err := c.Compile(s)

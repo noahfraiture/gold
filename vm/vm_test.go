@@ -129,6 +129,18 @@ func TestConditionals(t *testing.T) {
 	runVmTests(t, tests)
 }
 
+func TestWhile(t *testing.T) {
+	tests := []vmTestCase{
+		{"while (false) {10}", Null},
+		{"let x = 0; while (x < 10) {x++}", Null}, // While loop produce a Null value since there are expressions
+		{"let x = 0; while (x < 10) {x = x + 1}", Null},
+		{"let x = 0; while (x < 10) {x = x + 1} x", 10},
+		{"let x = 0; while (x < 10) {if (x == 8) {x = x + 20} else {x++}} x", 28},
+	}
+
+	runVmTests(t, tests)
+}
+
 func TestIncDecExpressions(t *testing.T) {
 	tests := []vmTestCase{
 		{"let x = 0; x++", 0},

@@ -374,6 +374,8 @@ func TestConditionals(t *testing.T) {
 				code.Make(code.OpConstant, 2),
 				// 0018
 				code.Make(code.OpPop),
+			},
+		},
 		{
 			input: `
 			if (true) { let x = 0 }; 1
@@ -391,8 +393,86 @@ func TestConditionals(t *testing.T) {
 				code.Make(code.OpPop),               // 0018
 			},
 		},
+	}
+	runCompilerTests(t, tests)
+}
+
+func TestLoops(t *testing.T) {
+	tests := []compilerTestCase{
+		{
+			input: `
+			while (true) { 10 }; 3333;
+			`,
+			expectedConstants: []interface{}{10, 3333},
+			expectedInstructions: []code.Instructions{
+				// 0000
+				code.Make(code.OpTrue),
+				// 0001
+				code.Make(code.OpJumpNotTruthy, 11),
+				// 0004
+				code.Make(code.OpConstant, 0),
+				// 0007
+				code.Make(code.OpPop),
+				// 0008
+				code.Make(code.OpJump, 0),
+				// 0011
+				code.Make(code.OpNull),
+				// 0012
+				code.Make(code.OpPop), // NOTE : while is an expression and so must produce a value
+				// 0013
+				code.Make(code.OpConstant, 1),
 				// 0017
 				code.Make(code.OpPop),
+			},
+		},
+		{
+			input: `
+      let x = 0
+      while (10 > x) {
+        if (x == 8) {
+          x = x + 20
+        } else {
+          x++
+        }
+      }
+      x
+      `,
+			expectedConstants: []interface{}{0, 10, 8, 20},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),  // 0000
+				code.Make(code.OpSetGlobal, 0), // 0003
+
+				// Condition
+				code.Make(code.OpConstant, 1),       // 0006
+				code.Make(code.OpGetGlobal, 0),      // 0009
+				code.Make(code.OpGreaterThan),       // 0012
+				code.Make(code.OpJumpNotTruthy, 53), // 0013
+
+				// if
+				code.Make(code.OpGetGlobal, 0),      // 0016
+				code.Make(code.OpConstant, 2),       // 0019
+				code.Make(code.OpEqual),             // 0022
+				code.Make(code.OpJumpNotTruthy, 39), // 0023
+				code.Make(code.OpGetGlobal, 0),      // 0026
+				code.Make(code.OpConstant, 3),       // 0029
+				code.Make(code.OpAdd),               // 0032
+				code.Make(code.OpSetGlobal, 0),      // 0033
+
+				code.Make(code.OpJump, 50),     // 0036
+				code.Make(code.OpGetGlobal, 0), // 0039
+				code.Make(code.OpGetGlobal, 0), // 0042
+				code.Make(code.OpInc),          // 0045
+				code.Make(code.OpSetGlobal, 0), // 0046
+				code.Make(code.OpPop),          // 0049
+
+				// loop
+				code.Make(code.OpJump, 6), // 0050
+				code.Make(code.OpNull),    // 0053
+				code.Make(code.OpPop),     // 0054
+
+				// x
+				code.Make(code.OpGetGlobal, 0), // 0055
+				code.Make(code.OpPop),          // 0058
 			},
 		},
 	}
