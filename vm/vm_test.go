@@ -123,6 +123,7 @@ func TestConditionals(t *testing.T) {
 		{"if (1 > 2) { 10 }", Null},
 		{"if (false) { 10 }", Null},
 		{"if ((if (false) { 10 })) { 10 } else { 20 }", 20},
+		{"if (true) {}", true}, // The last popped value is the conditional
 	}
 
 	runVmTests(t, tests)

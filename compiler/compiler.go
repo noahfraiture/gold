@@ -226,16 +226,13 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return err
 		}
 
-		if c.lastInstructionIs(code.OpPop) {
-			c.removeLastPop()
-		}
-
 		// Emit an `OpJump` with a bogus value
 		jumpPos := c.emit(code.OpJump, 9999)
 
 		afterConsequencePos := len(c.currentInstructions())
 		c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
 
+		// Here we don't need a pop operation since it will be generated for the IfExpression
 		if node.Alternative == nil {
 			c.emit(code.OpNull)
 		} else {
@@ -249,7 +246,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 			}
 		}
 
-		afterAlternativePos := len(c.currentInstructions())
+		afterAlternativePos := len(c.currentInstructions()) + 1 // The  + 1 is necessary to jump after the pop that will be generated for the IfExpression
 		c.changeOperand(jumpPos, afterAlternativePos)
 
 	case *ast.BlockStatement:
