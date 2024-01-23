@@ -280,11 +280,17 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 	case *ast.LetStatement:
-		symbol := c.symbolTable.Define(node.Name.Value)
+		symbol := c.symbolTable.Define(node.Name.Value, false)
 		err := c.Compile(node.Value)
 		if err != nil {
 			return err
 		}
+
+		if c.lastInstructionIs(code.OpNull) {
+			return errors.New("can't use 'let' statement with null")
+		}
+
+		// TODO : Only works with static return. Must also check possible dynamic binding. IDK how
 
 		if symbol.Scope == GlobalScope {
 			c.emit(code.OpSetGlobal, symbol.Index)
@@ -300,6 +306,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 		err := c.Compile(node.Value)
 		if err != nil {
 			return err
+		}
+
+		if symbol.Nullable || c.lastInstructionIs(code.OpNull) {
+			return errors.New("Your value is not nullable")
 		}
 
 		if symbol.Scope == GlobalScope {
@@ -373,7 +383,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 		for _, p := range node.Parameters {
-			c.symbolTable.Define(p.Value)
+			c.symbolTable.Define(p.Value, true)
 		}
 
 		err := c.Compile(node.Body)

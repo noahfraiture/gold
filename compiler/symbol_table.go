@@ -14,7 +14,10 @@ type Symbol struct {
 	Name  string
 	Scope SymbolScope
 
-	Index int // NOTE : number of symbol in the table. Index when the VM will add the symbol in its list of symbol in the correct scope.
+	// NOTE : number of symbol in the table. Index when the VM will
+	// add the symbol in its list of symbol in the correct scope.
+	Index    int
+	Nullable bool
 }
 
 type SymbolTable struct {
@@ -38,8 +41,8 @@ func NewSymbolTable() *SymbolTable {
 	return &SymbolTable{store: s, FreeSymbols: free}
 }
 
-func (s *SymbolTable) Define(name string) Symbol {
-	symbol := Symbol{Name: name, Index: s.numDefinitions}
+func (s *SymbolTable) Define(name string, nullable bool) Symbol {
+	symbol := Symbol{Name: name, Index: s.numDefinitions, Nullable: nullable}
 	if s.Outer == nil {
 		symbol.Scope = GlobalScope
 	} else {
