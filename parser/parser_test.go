@@ -41,6 +41,41 @@ func TestLetStatements(t *testing.T) {
 	}
 }
 
+// TODO : again very similar
+func TestMayStatements(t *testing.T) {
+	tests := []struct {
+		input              string
+		expectedIdentifier string
+		expectedValue      interface{}
+	}{
+		{"may x = 5;", "x", 5},
+		{"may y = true;", "y", true},
+		{"may foobar = y;", "foobar", "y"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserErrors(t, p)
+
+		if len(program.Statements) != 1 {
+			t.Fatalf("program.Statements does not contain 1 statements. got=%d",
+				len(program.Statements))
+		}
+
+		stmt := program.Statements[0]
+		if !testMayStatement(t, stmt, tt.expectedIdentifier) {
+			return
+		}
+
+		val := stmt.(*ast.MayStatement).Value
+		if !testLiteralExpression(t, val, tt.expectedValue) {
+			return
+		}
+	}
+}
+
 func TestReassignStatements(t *testing.T) {
 	tests := []struct {
 		input              string
@@ -1171,6 +1206,32 @@ func testLetStatement(t *testing.T, s ast.Statement, name string) bool {
 	if letStmt.Name.TokenLiteral() != name {
 		t.Errorf("letStmt.Name.TokenLiteral() not '%s'. got=%s",
 			name, letStmt.Name.TokenLiteral())
+		return false
+	}
+
+	return true
+}
+
+func testMayStatement(t *testing.T, s ast.Statement, name string) bool {
+	if s.TokenLiteral() != "may" {
+		t.Errorf("s.TokenLiteral not 'may'. got=%q", s.TokenLiteral())
+		return false
+	}
+
+	mayStmt, ok := s.(*ast.MayStatement)
+	if !ok {
+		t.Errorf("s not *ast.MayStatement. got=%T", s)
+		return false
+	}
+
+	if mayStmt.Name.Value != name {
+		t.Errorf("mayStmt.Name.Value not '%s'. got=%s", name, mayStmt.Name.Value)
+		return false
+	}
+
+	if mayStmt.Name.TokenLiteral() != name {
+		t.Errorf("mayStmt.Name.TokenLiteral() not '%s'. got=%s",
+			name, mayStmt.Name.TokenLiteral())
 		return false
 	}
 

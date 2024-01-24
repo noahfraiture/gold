@@ -32,6 +32,14 @@ func Start(in io.Reader, out io.Writer) {
 		}
 
 		line := scanner.Text()
+
+		if line == "" {
+			continue
+		}
+		if line == "exit" {
+			return
+		}
+
 		l := lexer.New(line)
 		p := parser.New(l)
 
@@ -42,7 +50,7 @@ func Start(in io.Reader, out io.Writer) {
 		}
 
 		comp := compiler.NewWithState(symbolTable, constants)
-		err := comp.Compile(program)
+		err, _ := comp.Compile(program)
 		if err != nil {
 			fmt.Fprintf(out, "Woops! Compilation failed:\n %s\n", err)
 			continue

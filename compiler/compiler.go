@@ -49,52 +49,61 @@ func NewWithState(s *SymbolTable, constants []object.Object) *Compiler {
 // Compile : create the bytecode from the instructions in the AST and add it in the compiled instructions.
 // When it encounters an Integer or a function, add it on the pool of constant. To query it
 // we use the index in the constant pool and the op opConstant.
-func (c *Compiler) Compile(node ast.Node) error {
+func (c *Compiler) Compile(node ast.Node) (error, bool) {
+	var err error
+	mayBeNull := false
 	switch node := node.(type) {
 	case *ast.Program:
 		for _, s := range node.Statements {
-			err := c.Compile(s)
+			err, mayBeNull = c.Compile(s)
 			if err != nil {
-				return err
+				return err, mayBeNull
 			}
 		}
 
 	case *ast.ExpressionStatement:
-		err := c.Compile(node.Expression)
+		err, mayBeNull = c.Compile(node.Expression)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 		c.emit(code.OpPop)
 
 	case *ast.InfixExpression:
 		// This separate case reverse the order of right and left. With that we can use the same opCode for < and >
+		// TODO : check type everywhere
+
 		if node.Operator == "<" || node.Operator == "<=" {
-			err := c.Compile(node.Right)
+			err, rightMayBeNull := c.Compile(node.Right)
 			if err != nil {
-				return err
+				return err, mayBeNull
 			}
 
-			err = c.Compile(node.Left)
+			err, leftMayBeNull := c.Compile(node.Left)
 			if err != nil {
-				return err
+				return err, mayBeNull
 			}
+
+			mayBeNull = leftMayBeNull || rightMayBeNull
+
 			if node.Operator == "<" {
 				c.emit(code.OpGreaterThan)
 			} else {
 				c.emit(code.OpGreaterEqualThan)
 			}
-			return nil
+			return nil, mayBeNull
 		}
 
-		err := c.Compile(node.Left)
+		err, leftMayBeNull := c.Compile(node.Left)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 
-		err = c.Compile(node.Right)
+		err, rightMayBeNull := c.Compile(node.Right)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
+
+		mayBeNull = leftMayBeNull || rightMayBeNull
 
 		switch node.Operator {
 		case "+":
@@ -114,7 +123,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		case "!=":
 			c.emit(code.OpNotEqual)
 		default:
-			return fmt.Errorf("unknown operator %s", node.Operator)
+			return fmt.Errorf("unknown operator %s", node.Operator), mayBeNull
 		}
 
 	case *ast.IntegerLiteral:
@@ -129,7 +138,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// Compile twice to have two OpGet to still have one after modification
 		symbol, ok := c.symbolTable.Resolve(node.Left.Value)
 		if !ok {
-			return nil
+			return nil, true
 		}
 		if symbol.Scope == GlobalScope {
 			c.emit(code.OpGetGlobal, symbol.Index)
@@ -145,7 +154,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		case "--":
 			c.emit(code.OpDec)
 		default:
-			return fmt.Errorf("unknown operator %s", node.Operator)
+			return fmt.Errorf("unknown operator %s", node.Operator), true
 		}
 
 		if symbol.Scope == GlobalScope {
@@ -161,7 +170,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// Compile twice to have two OpGet to still have one after modification
 		symbol, ok := c.symbolTable.Resolve(node.Right.Value)
 		if !ok {
-			return nil
+			return fmt.Errorf("unknown name %s", node.Right.Value), true
 		}
 		if symbol.Scope == GlobalScope {
 			c.emit(code.OpGetGlobal, symbol.Index)
@@ -175,7 +184,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		case "--":
 			c.emit(code.OpDec)
 		default:
-			return fmt.Errorf("unknown operator %s", node.Operator)
+			return fmt.Errorf("unknown operator %s", node.Operator), true
 		}
 
 		if symbol.Scope == GlobalScope {
@@ -199,11 +208,12 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 	case *ast.Null:
 		c.emit(code.OpNull)
+		mayBeNull = true
 
 	case *ast.PrefixExpression:
-		err := c.Compile(node.Right)
+		err, mayBeNull = c.Compile(node.Right)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 
 		switch node.Operator {
@@ -212,21 +222,22 @@ func (c *Compiler) Compile(node ast.Node) error {
 		case "-":
 			c.emit(code.OpMinus)
 		default:
-			return fmt.Errorf("unknown operator %s", node.Operator)
+			return fmt.Errorf("unknown operator %s", node.Operator), true
 		}
 
 	case *ast.IfExpression:
-		err := c.Compile(node.Condition)
+		err, _ = c.Compile(node.Condition)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 
 		// Emit an `OpJumpNotTruthy` with a bogus value
 		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
 
-		err = c.Compile(node.Consequence)
+		err, consMayBeNull := c.Compile(node.Consequence)
+		mayBeNull = mayBeNull || consMayBeNull
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 
 		if c.lastInstructionIs(code.OpPop) {
@@ -243,10 +254,12 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		if node.Alternative == nil {
 			c.emit(code.OpNull)
+			mayBeNull = true
 		} else {
-			err := c.Compile(node.Alternative)
+			err, altMayBeNull := c.Compile(node.Alternative)
+			mayBeNull = mayBeNull || altMayBeNull
 			if err != nil {
-				return err
+				return err, mayBeNull
 			}
 			if c.lastInstructionIs(code.OpPop) {
 				c.removeLastPop()
@@ -261,16 +274,16 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.WhileExpression:
 		pos := len(c.currentInstructions())
 
-		err := c.Compile(node.Condition)
+		err, _ = c.Compile(node.Condition)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 
 		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
 
-		err = c.Compile(node.Consequence)
+		err, _ = c.Compile(node.Consequence)
 		if err != nil {
-			return nil
+			return err, mayBeNull
 		}
 
 		c.emit(code.OpJump, pos)
@@ -279,27 +292,41 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
 
 		c.emit(code.OpNull) // NOTE : since it's an expression, must produce a value
+		mayBeNull = true
 
 	case *ast.BlockStatement:
 		for _, s := range node.Statements {
-			err := c.Compile(s)
+			err, tmpMayBeNull := c.Compile(s)
+			mayBeNull = mayBeNull || tmpMayBeNull
 			if err != nil {
-				return err
+				return err, mayBeNull
 			}
 		}
 
 	case *ast.LetStatement:
 		symbol := c.symbolTable.Define(node.Name.Value, false)
-		err := c.Compile(node.Value)
+		err, mayBeNull = c.Compile(node.Value)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 
-		if c.lastInstructionIs(code.OpNull) {
-			return errors.New("can't use 'let' statement with null")
+		if mayBeNull {
+			return errors.New("can't use 'let' statement with null"), true
 		}
 
-		// TODO : Only works with static return. Must also check possible dynamic binding. IDK how
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpSetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
+		}
+
+	case *ast.MayStatement:
+		// TODO : again very similar to let, can refactor
+		symbol := c.symbolTable.Define(node.Name.Value, true)
+		err, _ = c.Compile(node.Value)
+		if err != nil {
+			return err, mayBeNull
+		}
 
 		if symbol.Scope == GlobalScope {
 			c.emit(code.OpSetGlobal, symbol.Index)
@@ -310,15 +337,15 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.ReassignStatement:
 		symbol, ok := c.symbolTable.Resolve(node.Name.Value)
 		if !ok {
-			return errors.New("undefined variable " + node.Name.Value)
+			return errors.New("undefined variable " + node.Name.Value), true
 		}
-		err := c.Compile(node.Value)
+		err, mayBeNull = c.Compile(node.Value)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 
-		if symbol.Nullable || c.lastInstructionIs(code.OpNull) {
-			return errors.New("your value is not nullable")
+		if !symbol.Nullable && mayBeNull {
+			return errors.New("your value is not nullable"), true
 		}
 
 		if symbol.Scope == GlobalScope {
@@ -330,10 +357,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.Identifier:
 		symbol, ok := c.symbolTable.Resolve(node.Value)
 		if !ok {
-			return fmt.Errorf("undefined variable %s", node.Value)
+			return fmt.Errorf("undefined variable %s", node.Value), true
 		}
 
 		c.loadSymbol(symbol)
+		mayBeNull = symbol.Nullable
 
 	case *ast.StringLiteral:
 		str := &object.String{Value: node.Value}
@@ -341,9 +369,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 	case *ast.ArrayLiteral:
 		for _, el := range node.Elements {
-			err := c.Compile(el)
+			err, _ = c.Compile(el)
 			if err != nil {
-				return err
+				return err, mayBeNull
 			}
 		}
 
@@ -359,27 +387,29 @@ func (c *Compiler) Compile(node ast.Node) error {
 		})
 
 		for _, k := range keys {
-			err := c.Compile(k)
+			// TODO : check nullable
+			err, _ = c.Compile(k)
 			if err != nil {
-				return err
+				return err, mayBeNull
 			}
-			err = c.Compile(node.Pairs[k])
+			err, _ = c.Compile(node.Pairs[k])
 			if err != nil {
-				return err
+				return err, mayBeNull
 			}
 		}
 
 		c.emit(code.OpHash, len(node.Pairs)*2)
 
 	case *ast.IndexExpression:
-		err := c.Compile(node.Left)
+		// TODO : error if null ?
+		err, mayBeNull = c.Compile(node.Left)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 
-		err = c.Compile(node.Index)
+		err, mayBeNull = c.Compile(node.Index)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 
 		c.emit(code.OpIndex)
@@ -395,9 +425,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.symbolTable.Define(p.Value, true)
 		}
 
-		err := c.Compile(node.Body)
+		err, mayBeNull = c.Compile(node.Body)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 
 		// NOTE : implicit return
@@ -426,23 +456,23 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.emit(code.OpClosure, fnIndex, len(freeSymbols))
 
 	case *ast.ReturnStatement:
-		err := c.Compile(node.ReturnValue)
+		err, mayBeNull = c.Compile(node.ReturnValue)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 
 		c.emit(code.OpReturnValue)
 
 	case *ast.CallExpression:
-		err := c.Compile(node.Function)
+		err, mayBeNull = c.Compile(node.Function)
 		if err != nil {
-			return err
+			return err, mayBeNull
 		}
 
 		for _, a := range node.Arguments {
-			err := c.Compile(a)
+			err, _ = c.Compile(a)
 			if err != nil {
-				return err
+				return err, mayBeNull
 			}
 		}
 
@@ -450,7 +480,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 	}
 
-	return nil
+	return err, mayBeNull
 }
 
 func (c *Compiler) Bytecode() *Bytecode {

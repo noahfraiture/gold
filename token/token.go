@@ -46,6 +46,7 @@ const (
 	// Keywords
 	FUNCTION = "FUNCTION"
 	LET      = "LET"
+	MAY      = "MAY"
 	TRUE     = "TRUE"
 	FALSE    = "FALSE"
 	NULL     = "NULL"
@@ -63,6 +64,7 @@ type Token struct {
 var keywords = map[string]TokenType{
 	"fn":     FUNCTION,
 	"let":    LET,
+	"may":    MAY,
 	"true":   TRUE,
 	"false":  FALSE,
 	"null":   NULL,

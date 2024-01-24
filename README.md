@@ -18,4 +18,5 @@ Here's list of addition of my self
 - 'x++' and 'x--' return the value of the identifier then increment of decrement
 - '++x' and '--x' increment or decrement then return the value
 - while loop
+- null safety. keyword 'may' instead of 'let' to accept null value. Yeah there's no type check currently so null safety without type is weird, but whatever it's cool
 

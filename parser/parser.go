@@ -129,6 +129,8 @@ func (p *Parser) parseStatement() ast.Statement {
 	switch p.curToken.Type {
 	case token.LET:
 		return p.parseLetStatement()
+	case token.MAY:
+		return p.parseMayStatement()
 	case token.RETURN:
 		return p.parseReturnStatement()
 	default:
@@ -141,6 +143,37 @@ func (p *Parser) parseStatement() ast.Statement {
 // TODO : refactor to use less space
 func (p *Parser) parseLetStatement() *ast.LetStatement {
 	stmt := &ast.LetStatement{Token: p.curToken}
+
+	if !p.expectPeek(token.IDENT) {
+		return nil
+	}
+
+	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if !p.expectPeek(token.ASSIGN) {
+		return nil
+	}
+
+	p.nextToken()
+
+	stmt.Value = p.parseExpression(LOWEST)
+
+	// TODO : what is fl ?
+	// next function also
+	if fl, ok := stmt.Value.(*ast.FunctionLiteral); ok {
+		fl.Name = stmt.Name.Value
+	}
+
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+
+	return stmt
+}
+
+// TODO : very similar to let, can refactor
+func (p *Parser) parseMayStatement() *ast.MayStatement {
+	stmt := &ast.MayStatement{Token: p.curToken}
 
 	if !p.expectPeek(token.IDENT) {
 		return nil

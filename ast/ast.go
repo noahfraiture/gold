@@ -72,6 +72,31 @@ func (ls *LetStatement) String() string {
 	return out.String()
 }
 
+// TODO : again very similar, could refactor this with let
+type MayStatement struct {
+	Value Expression
+	Name  *Identifier
+	Token token.Token // the token.LET token
+}
+
+func (ms *MayStatement) statementNode()       {}
+func (ms *MayStatement) TokenLiteral() string { return ms.Token.Literal }
+func (ms *MayStatement) String() string {
+	var out bytes.Buffer
+
+	out.WriteString(ms.TokenLiteral() + " ")
+	out.WriteString(ms.Name.String())
+	out.WriteString(" = ")
+
+	if ms.Value != nil {
+		out.WriteString(ms.Value.String())
+	}
+
+	out.WriteString(";")
+
+	return out.String()
+}
+
 type ReassignStatement struct {
 	Value Expression
 	Name  *Identifier

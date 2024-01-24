@@ -38,7 +38,7 @@ x++
 while (true) {
   x++
 }
-x = null
+may x = null
 `
 
 	tests := []struct {
@@ -152,6 +152,7 @@ x = null
 		{token.IDENT, "x"},
 		{token.INC, "++"},
 		{token.RBRACE, "}"},
+		{token.MAY, "may"},
 		{token.IDENT, "x"},
 		{token.ASSIGN, "="},
 		{token.NULL, "null"},

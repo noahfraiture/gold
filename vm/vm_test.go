@@ -123,7 +123,7 @@ func TestConditionals(t *testing.T) {
 		{"if (1 > 2) { 10 }", Null},
 		{"if (false) { 10 }", Null},
 		{"if ((if (false) { 10 })) { 10 } else { 20 }", 20},
-		{"if (true) {}", true}, // The last popped value is the conditional
+		{"if (true) {}", Null}, // The last popped value is the conditional
 	}
 
 	runVmTests(t, tests)
@@ -394,22 +394,22 @@ func TestCallingFunctionsWithArgumentsAndBindings(t *testing.T) {
 	tests := []vmTestCase{
 		{
 			input: `
-		let identity = fn(a) { a; };
+		may identity = fn(a) { a; };
 		identity(4);
 		`,
 			expected: 4,
 		},
 		{
 			input: `
-		let sum = fn(a, b) { a + b; };
+		may sum = fn(a, b) { a + b; };
 		sum(1, 2);
 		`,
 			expected: 3,
 		},
 		{
 			input: `
-		let sum = fn(a, b) {
-			let c = a + b;
+		may sum = fn(a, b) {
+			may c = a + b;
 			c;
 		};
 		sum(1, 2);
@@ -418,8 +418,8 @@ func TestCallingFunctionsWithArgumentsAndBindings(t *testing.T) {
 		},
 		{
 			input: `
-		let sum = fn(a, b) {
-			let c = a + b;
+		may sum = fn(a, b) {
+			may c = a + b;
 			c;
 		};
 		sum(1, 2) + sum(3, 4);`,
@@ -427,11 +427,11 @@ func TestCallingFunctionsWithArgumentsAndBindings(t *testing.T) {
 		},
 		{
 			input: `
-		let sum = fn(a, b) {
-			let c = a + b;
+		may sum = fn(a, b) {
+			may c = a + b;
 			c;
 		};
-		let outer = fn() {
+		may outer = fn() {
 			sum(1, 2) + sum(3, 4);
 		};
 		outer();
@@ -442,12 +442,12 @@ func TestCallingFunctionsWithArgumentsAndBindings(t *testing.T) {
 			input: `
 		let globalNum = 10;
 
-		let sum = fn(a, b) {
-			let c = a + b;
+		may sum = fn(a, b) {
+			may c = a + b;
 			c + globalNum;
 		};
 
-		let outer = fn() {
+		may outer = fn() {
 			sum(1, 2) + sum(3, 4) + globalNum;
 		};
 
@@ -480,7 +480,7 @@ func TestCallingFunctionsWithWrongArguments(t *testing.T) {
 		program := parse(tt.input)
 
 		comp := compiler.New()
-		err := comp.Compile(program)
+		err, _ := comp.Compile(program)
 		if err != nil {
 			t.Fatalf("compiler error: %s", err)
 		}
@@ -551,46 +551,46 @@ func TestClosures(t *testing.T) {
 	tests := []vmTestCase{
 		{
 			input: `
-		let newClosure = fn(a) {
+		may newClosure = fn(a) {
 			fn() { a; };
 		};
-		let closure = newClosure(99);
+		may closure = newClosure(99);
 		closure();
 		`,
 			expected: 99,
 		},
 		{
 			input: `
-		let newAdder = fn(a, b) {
+		may newAdder = fn(a, b) {
 			fn(c) { a + b + c };
 		};
-		let adder = newAdder(1, 2);
+		may adder = newAdder(1, 2);
 		adder(8);
 		`,
 			expected: 11,
 		},
 		{
 			input: `
-		let newAdder = fn(a, b) {
-			let c = a + b;
+		may newAdder = fn(a, b) {
+			may c = a + b;
 			fn(d) { c + d };
 		};
-		let adder = newAdder(1, 2);
+		may adder = newAdder(1, 2);
 		adder(8);
 		`,
 			expected: 11,
 		},
 		{
 			input: `
-		let newAdderOuter = fn(a, b) {
-			let c = a + b;
+		may newAdderOuter = fn(a, b) {
+			may c = a + b;
 			fn(d) {
-				let e = d + c;
+				may e = d + c;
 				fn(f) { e + f; };
 			};
 		};
-		let newAdderInner = newAdderOuter(1, 2)
-		let adder = newAdderInner(3);
+		may newAdderInner = newAdderOuter(1, 2)
+		may adder = newAdderInner(3);
 		adder(8);
 		`,
 			expected: 14,
@@ -598,25 +598,25 @@ func TestClosures(t *testing.T) {
 		{
 			input: `
 		let a = 1;
-		let newAdderOuter = fn(b) {
+		may newAdderOuter = fn(b) {
 			fn(c) {
 				fn(d) { a + b + c + d };
 			};
 		};
-		let newAdderInner = newAdderOuter(2)
-		let adder = newAdderInner(3);
+		may newAdderInner = newAdderOuter(2)
+		may adder = newAdderInner(3);
 		adder(8);
 		`,
 			expected: 14,
 		},
 		{
 			input: `
-		let newClosure = fn(a, b) {
-			let one = fn() { a; };
-			let two = fn() { b; };
+		may newClosure = fn(a, b) {
+			may one = fn() { a; };
+			may two = fn() { b; };
 			fn() { one() + two(); };
 		};
-		let closure = newClosure(9, 90);
+		may closure = newClosure(9, 90);
 		closure();
 		`,
 			expected: 99,
@@ -714,7 +714,7 @@ func runVmTests(t *testing.T, tests []vmTestCase) {
 		program := parse(tt.input)
 
 		comp := compiler.New()
-		err := comp.Compile(program)
+		err, _ := comp.Compile(program)
 		if err != nil {
 			t.Fatalf("compiler error: %s", err)
 		}

@@ -514,12 +514,12 @@ func TestLoops(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
-func TestGlobalLetStatements(t *testing.T) {
+func TestGlobalBindStatements(t *testing.T) {
 	tests := []compilerTestCase{
 		{
 			input: `
 			let one = 1;
-			let two = 2;
+			may two = 2;
 			`,
 			expectedConstants: []interface{}{1, 2},
 			expectedInstructions: []code.Instructions{
@@ -545,7 +545,7 @@ func TestGlobalLetStatements(t *testing.T) {
 		{
 			input: `
 			let one = 1;
-			let two = one;
+			may two = one;
 			two;
 			`,
 			expectedConstants: []interface{}{1},
@@ -553,6 +553,22 @@ func TestGlobalLetStatements(t *testing.T) {
 				code.Make(code.OpConstant, 0),
 				code.Make(code.OpSetGlobal, 0),
 				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpSetGlobal, 1),
+				code.Make(code.OpGetGlobal, 1),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input: `
+			let one = 1;
+			may two = null;
+			two;
+			`,
+			expectedConstants: []interface{}{1},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpNull),
 				code.Make(code.OpSetGlobal, 1),
 				code.Make(code.OpGetGlobal, 1),
 				code.Make(code.OpPop),
@@ -866,7 +882,7 @@ func TestFunctionCalls(t *testing.T) {
 		},
 		{
 			input: `
-			let oneArg = fn(a) { a };
+			may oneArg = fn(a) { a };
 			oneArg(24);
 			`,
 			expectedConstants: []interface{}{
@@ -887,7 +903,7 @@ func TestFunctionCalls(t *testing.T) {
 		},
 		{
 			input: `
-			let manyArg = fn(a, b, c) { a; b; c };
+			may manyArg = fn(a, b, c) { a; b; c };
 			manyArg(24, 25, 26);
 			`,
 			expectedConstants: []interface{}{
@@ -1229,6 +1245,72 @@ func TestRecursiveFunctions(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestNullableExpression(t *testing.T) {
+	tests := []compilerTestError{
+		{
+			input:           `let x = null`,
+			expectedMessage: fmt.Errorf("can't use 'let' statement with null"),
+		},
+		{
+			input: `
+      let x = 0
+      x = null
+      `,
+			expectedMessage: fmt.Errorf("your value is not nullable"),
+		},
+		{
+			input: `
+      let x = 0
+      x = if (true) {3}
+      `,
+			expectedMessage: fmt.Errorf("your value is not nullable"),
+		},
+		{
+			input: `
+      let x = 0
+      may f = fn() {
+        return null
+      }
+      x = f()
+      `,
+			expectedMessage: fmt.Errorf("your value is not nullable"),
+		},
+		{
+			input: `
+      let x = 0
+      may f = fn() {
+        let y = 0
+        while (y < 10) {
+          y++;
+        }
+        if (y == 10) {
+          return 3
+        }
+      }
+      x = f()
+      `,
+			expectedMessage: fmt.Errorf("your value is not nullable"),
+		},
+		{
+			input: `
+      let x = while (true) {1}
+      `,
+			expectedMessage: fmt.Errorf("can't use 'let' statement with null"),
+		},
+		{
+			input: `
+      let f = fn(a, b) {
+        a + b
+      }
+      let x = f(null, 2)
+      `,
+			expectedMessage: fmt.Errorf("can't use 'let' statement with null"),
+		},
+	}
+
+	runCompilerTestsError(t, tests)
+}
+
 func parse(input string) *ast.Program {
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1359,6 +1441,29 @@ func testStringObject(expected string, actual object.Object) error {
 	return nil
 }
 
+type compilerTestError struct {
+	input           string
+	expectedMessage error
+}
+
+func runCompilerTestsError(t *testing.T, tests []compilerTestError) {
+	t.Helper()
+
+	for _, tt := range tests {
+		program := parse(tt.input)
+
+		compiler := New()
+		err, _ := compiler.Compile(program)
+		if err == nil {
+			t.Fatalf("compiler did not produce error, got ")
+		}
+
+		if err.Error() != tt.expectedMessage.Error() {
+			t.Fatalf("error wrong. got=%q, want=%q", err, tt.expectedMessage)
+		}
+	}
+}
+
 type compilerTestCase struct {
 	input                string
 	expectedConstants    []interface{}
@@ -1372,7 +1477,7 @@ func runCompilerTests(t *testing.T, tests []compilerTestCase) {
 		program := parse(tt.input)
 
 		compiler := New()
-		err := compiler.Compile(program)
+		err, _ := compiler.Compile(program)
 		if err != nil {
 			t.Fatalf("compiler error: %s", err)
 		}
