@@ -207,22 +207,13 @@ func (vm *VM) Run() error {
 				return err
 			}
 
-		case code.OpReturnValue:
+		case code.OpReturn:
 			returnValue := vm.pop()
 
 			frame := vm.popFrame()
 			vm.sp = frame.basePointer - 1
 
 			err := vm.push(returnValue)
-			if err != nil {
-				return err
-			}
-
-		case code.OpReturn:
-			frame := vm.popFrame()
-			vm.sp = frame.basePointer - 1
-
-			err := vm.push(Null)
 			if err != nil {
 				return err
 			}
