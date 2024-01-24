@@ -38,6 +38,7 @@ x++
 while (true) {
   x++
 }
+x = null
 `
 
 	tests := []struct {
@@ -151,6 +152,9 @@ while (true) {
 		{token.IDENT, "x"},
 		{token.INC, "++"},
 		{token.RBRACE, "}"},
+		{token.IDENT, "x"},
+		{token.ASSIGN, "="},
+		{token.NULL, "null"},
 		{token.EOF, ""},
 	}
 

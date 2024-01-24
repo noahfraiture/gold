@@ -322,6 +322,67 @@ func TestBooleanExpressions(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestNullExpression(t *testing.T) {
+	tests := []compilerTestCase{
+		{
+			input:             "null",
+			expectedConstants: []interface{}{},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpNull),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input:             "false == null",
+			expectedConstants: []interface{}{},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpFalse),
+				code.Make(code.OpNull),
+				code.Make(code.OpEqual),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input:             "if (true) { null }",
+			expectedConstants: []interface{}{},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpTrue),             // 0000
+				code.Make(code.OpJumpNotTruthy, 8), // 0001
+				code.Make(code.OpNull),             // 0004
+				code.Make(code.OpJump, 9),          // 0005
+				code.Make(code.OpNull),             // 0008
+				code.Make(code.OpPop),              // 0009
+			},
+		},
+		{
+			input:             "if (true) { }",
+			expectedConstants: []interface{}{},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpTrue),             // 0000
+				code.Make(code.OpJumpNotTruthy, 8), // 0001
+				code.Make(code.OpNull),             // 0004
+				code.Make(code.OpJump, 9),          // 0005
+				code.Make(code.OpNull),             // 0008
+				code.Make(code.OpPop),              // 0009
+			},
+		},
+		{
+			input:             "if (true) { } else { }",
+			expectedConstants: []interface{}{},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpTrue),             // 0000
+				code.Make(code.OpJumpNotTruthy, 8), // 0001
+				code.Make(code.OpNull),             // 0004
+				code.Make(code.OpJump, 9),          // 0005
+				code.Make(code.OpNull),             // 0008
+				code.Make(code.OpPop),              // 0009
+			},
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
 func TestConditionals(t *testing.T) {
 	tests := []compilerTestCase{
 		{
@@ -330,24 +391,14 @@ func TestConditionals(t *testing.T) {
 			`,
 			expectedConstants: []interface{}{10, 3333},
 			expectedInstructions: []code.Instructions{
-				// 0000
-				code.Make(code.OpTrue),
-				// 0001
-				code.Make(code.OpJumpNotTruthy, 11),
-				// 0004
-				code.Make(code.OpConstant, 0),
-				// 0007
-				code.Make(code.OpPop),
-				// 0008
-				code.Make(code.OpJump, 13),
-				// 0011
-				code.Make(code.OpNull),
-				// 0012
-				code.Make(code.OpPop),
-				// 0013
-				code.Make(code.OpConstant, 1),
-				// 0016
-				code.Make(code.OpPop),
+				code.Make(code.OpTrue),              // 0000
+				code.Make(code.OpJumpNotTruthy, 10), // 0001
+				code.Make(code.OpConstant, 0),       // 0004
+				code.Make(code.OpJump, 11),          // 0007
+				code.Make(code.OpNull),              // 0010
+				code.Make(code.OpPop),               // 0011
+				code.Make(code.OpConstant, 1),       // 0012
+				code.Make(code.OpPop),               // 0015
 			},
 		},
 		{
@@ -356,24 +407,14 @@ func TestConditionals(t *testing.T) {
 			`,
 			expectedConstants: []interface{}{10, 20, 3333},
 			expectedInstructions: []code.Instructions{
-				// 0000
-				code.Make(code.OpTrue),
-				// 0001
-				code.Make(code.OpJumpNotTruthy, 11),
-				// 0004
-				code.Make(code.OpConstant, 0),
-				// 0007
-				code.Make(code.OpPop),
-				// 0008
-				code.Make(code.OpJump, 15),
-				// 0011
-				code.Make(code.OpConstant, 1),
-				// 0014
-				code.Make(code.OpPop),
-				// 0015
-				code.Make(code.OpConstant, 2),
-				// 0018
-				code.Make(code.OpPop),
+				code.Make(code.OpTrue),              // 0000
+				code.Make(code.OpJumpNotTruthy, 10), // 0001
+				code.Make(code.OpConstant, 0),       // 0004
+				code.Make(code.OpJump, 13),          // 0007
+				code.Make(code.OpConstant, 1),       // 0010
+				code.Make(code.OpPop),               // 0013
+				code.Make(code.OpConstant, 2),       // 0014
+				code.Make(code.OpPop),               // 0017
 			},
 		},
 		{
@@ -383,14 +424,15 @@ func TestConditionals(t *testing.T) {
 			expectedConstants: []interface{}{0, 1},
 			expectedInstructions: []code.Instructions{
 				code.Make(code.OpTrue),              // 0000
-				code.Make(code.OpJumpNotTruthy, 13), // 0001
+				code.Make(code.OpJumpNotTruthy, 14), // 0001
 				code.Make(code.OpConstant, 0),       // 0004
 				code.Make(code.OpSetGlobal, 0),      // 0007
-				code.Make(code.OpJump, 15),          // 0010
-				code.Make(code.OpNull),              // 0013
-				code.Make(code.OpPop),               // 0014
-				code.Make(code.OpConstant, 1),       // 0015
-				code.Make(code.OpPop),               // 0018
+				code.Make(code.OpNull),              // 0010
+				code.Make(code.OpJump, 15),          // 0011
+				code.Make(code.OpNull),              // 0014
+				code.Make(code.OpPop),               // 0015
+				code.Make(code.OpConstant, 1),       // 0016
+				code.Make(code.OpPop),               // 0019
 			},
 		},
 	}
@@ -405,24 +447,15 @@ func TestLoops(t *testing.T) {
 			`,
 			expectedConstants: []interface{}{10, 3333},
 			expectedInstructions: []code.Instructions{
-				// 0000
-				code.Make(code.OpTrue),
-				// 0001
-				code.Make(code.OpJumpNotTruthy, 11),
-				// 0004
-				code.Make(code.OpConstant, 0),
-				// 0007
-				code.Make(code.OpPop),
-				// 0008
-				code.Make(code.OpJump, 0),
-				// 0011
-				code.Make(code.OpNull),
-				// 0012
-				code.Make(code.OpPop), // NOTE : while is an expression and so must produce a value
-				// 0013
-				code.Make(code.OpConstant, 1),
-				// 0017
-				code.Make(code.OpPop),
+				code.Make(code.OpTrue),              // 0000
+				code.Make(code.OpJumpNotTruthy, 11), // 0001
+				code.Make(code.OpConstant, 0),       // 0004
+				code.Make(code.OpPop),               // 0007
+				code.Make(code.OpJump, 0),           // 0008
+				code.Make(code.OpNull),              // 0011
+				code.Make(code.OpPop),               // NOTE : while is an expression and so must produce a value// 0012
+				code.Make(code.OpConstant, 1),       // 0013
+				code.Make(code.OpPop),               // 0017
 			},
 		},
 		{
@@ -446,33 +479,34 @@ func TestLoops(t *testing.T) {
 				code.Make(code.OpConstant, 1),       // 0006
 				code.Make(code.OpGetGlobal, 0),      // 0009
 				code.Make(code.OpGreaterThan),       // 0012
-				code.Make(code.OpJumpNotTruthy, 53), // 0013
+				code.Make(code.OpJumpNotTruthy, 54), // 0013
 
 				// if
 				code.Make(code.OpGetGlobal, 0),      // 0016
 				code.Make(code.OpConstant, 2),       // 0019
 				code.Make(code.OpEqual),             // 0022
-				code.Make(code.OpJumpNotTruthy, 39), // 0023
+				code.Make(code.OpJumpNotTruthy, 40), // 0023
 				code.Make(code.OpGetGlobal, 0),      // 0026
 				code.Make(code.OpConstant, 3),       // 0029
 				code.Make(code.OpAdd),               // 0032
 				code.Make(code.OpSetGlobal, 0),      // 0033
+				code.Make(code.OpNull),              // 0036
+				code.Make(code.OpJump, 50),          // 0037
 
-				code.Make(code.OpJump, 50),     // 0036
-				code.Make(code.OpGetGlobal, 0), // 0039
-				code.Make(code.OpGetGlobal, 0), // 0042
-				code.Make(code.OpInc),          // 0045
-				code.Make(code.OpSetGlobal, 0), // 0046
-				code.Make(code.OpPop),          // 0049
+				code.Make(code.OpGetGlobal, 0), // 0040
+				code.Make(code.OpGetGlobal, 0), // 0043
+				code.Make(code.OpInc),          // 0046
+				code.Make(code.OpSetGlobal, 0), // 0047
+				code.Make(code.OpPop),          // 0050
 
 				// loop
-				code.Make(code.OpJump, 6), // 0050
-				code.Make(code.OpNull),    // 0053
-				code.Make(code.OpPop),     // 0054
+				code.Make(code.OpJump, 6), // 0051
+				code.Make(code.OpNull),    // 0054
+				code.Make(code.OpPop),     // 0055
 
 				// x
-				code.Make(code.OpGetGlobal, 0), // 0055
-				code.Make(code.OpPop),          // 0058
+				code.Make(code.OpGetGlobal, 0), // 0056
+				code.Make(code.OpPop),          // 0059
 			},
 		},
 	}

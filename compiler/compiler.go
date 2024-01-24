@@ -197,6 +197,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpFalse)
 		}
 
+	case *ast.Null:
+		c.emit(code.OpNull)
+
 	case *ast.PrefixExpression:
 		err := c.Compile(node.Right)
 		if err != nil {
@@ -226,13 +229,18 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return err
 		}
 
+		if c.lastInstructionIs(code.OpPop) {
+			c.removeLastPop()
+		} else {
+			c.emit(code.OpNull)
+		}
+
 		// Emit an `OpJump` with a bogus value
 		jumpPos := c.emit(code.OpJump, 9999)
 
 		afterConsequencePos := len(c.currentInstructions())
 		c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
 
-		// Here we don't need a pop operation since it will be generated for the IfExpression
 		if node.Alternative == nil {
 			c.emit(code.OpNull)
 		} else {
@@ -240,13 +248,14 @@ func (c *Compiler) Compile(node ast.Node) error {
 			if err != nil {
 				return err
 			}
-
 			if c.lastInstructionIs(code.OpPop) {
 				c.removeLastPop()
+			} else {
+				c.emit(code.OpNull)
 			}
 		}
 
-		afterAlternativePos := len(c.currentInstructions()) + 1 // The  + 1 is necessary to jump after the pop that will be generated for the IfExpression
+		afterAlternativePos := len(c.currentInstructions())
 		c.changeOperand(jumpPos, afterAlternativePos)
 
 	case *ast.WhileExpression:
@@ -309,7 +318,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 		if symbol.Nullable || c.lastInstructionIs(code.OpNull) {
-			return errors.New("Your value is not nullable")
+			return errors.New("your value is not nullable")
 		}
 
 		if symbol.Scope == GlobalScope {

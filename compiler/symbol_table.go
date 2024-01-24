@@ -87,7 +87,7 @@ func (s *SymbolTable) DefineFunctionName(name string) Symbol {
 func (s *SymbolTable) defineFree(original Symbol) Symbol {
 	s.FreeSymbols = append(s.FreeSymbols, original)
 
-	symbol := Symbol{Name: original.Name, Index: len(s.FreeSymbols) - 1}
+	symbol := Symbol{Name: original.Name, Index: len(s.FreeSymbols) - 1, Nullable: original.Nullable}
 	symbol.Scope = FreeScope
 
 	s.store[original.Name] = symbol

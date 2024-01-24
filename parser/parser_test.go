@@ -403,6 +403,22 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"(!(true == true))",
 		},
 		{
+			"null",
+			"null",
+		},
+		{
+			"x == null",
+			"(x == null)",
+		},
+		{
+			"add(1, 2) == true",
+			"(add(1, 2) == true)",
+		},
+		{
+			"!(true == null)",
+			"(!(true == null))",
+		},
+		{
 			"a + add(b * c) + d",
 			"((a + add((b * c))) + d)",
 		},
@@ -483,6 +499,42 @@ func TestBooleanExpression(t *testing.T) {
 		if boolean.Value != tt.expectedBoolean {
 			t.Errorf("boolean.Value not %t. got=%t", tt.expectedBoolean,
 				boolean.Value)
+		}
+	}
+}
+
+func TestNullExpression(t *testing.T) {
+	tests := []struct {
+		input       string
+		expectedNil any
+	}{
+		{"null;", nil},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserErrors(t, p)
+
+		if len(program.Statements) != 1 {
+			t.Fatalf("program has not enough statements. got=%d",
+				len(program.Statements))
+		}
+
+		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T",
+				program.Statements[0])
+		}
+
+		v, ok := stmt.Expression.(*ast.Null)
+		if !ok {
+			t.Fatalf("exp not *ast.Null. got=%T", stmt.Expression)
+		}
+		if v.Value != tt.expectedNil {
+			t.Errorf("boolean.Value not %t. got=%t", tt.expectedNil,
+				v.Value)
 		}
 	}
 }
