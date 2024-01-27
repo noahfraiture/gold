@@ -54,6 +54,19 @@ const (
 	ELSE     = "ELSE"
 	WHILE    = "WHILE"
 	RETURN   = "RETURN"
+
+	MINT = "MINT"
+	LINT = "LINT"
+	MFLT = "MFLT"
+	LFLT = "LFLT"
+	MSTR = "MSTR"
+	LSTR = "LSTR"
+	MARR = "MARR"
+	LARR = "LARR"
+	MDCT = "MDCT"
+	LDCT = "LDCT"
+	MFUN = "MFUN"
+	LFUN = "LFUN"
 )
 
 type Token struct {
@@ -72,6 +85,21 @@ var keywords = map[string]TokenType{
 	"else":   ELSE,
 	"while":  WHILE,
 	"return": RETURN,
+
+	"mint":        MINT,
+	"lint":        LINT,
+	"endeavouros": MINT,
+	"mflt":        MFLT,
+	"lflt":        LFLT,
+	"mstr":        MSTR,
+	"lstr":        LSTR,
+	"marr":        MARR,
+	"larr":        LARR,
+	"larry":       LARR,
+	"mdct":        MDCT,
+	"ldct":        LDCT,
+	"mfun":        MFUN,
+	"lfun":        LFUN,
 }
 
 func LookupIdent(ident string) TokenType {

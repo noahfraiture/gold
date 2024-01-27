@@ -21,7 +21,7 @@ func Start(in io.Reader, out io.Writer) {
 
 	symbolTable := compiler.NewSymbolTable()
 	for i, v := range object.Builtins {
-		symbolTable.DefineBuiltin(i, v.Name)
+		symbolTable.DefineBuiltin(i, v.Name, v.Type)
 	}
 
 	for {
@@ -50,7 +50,7 @@ func Start(in io.Reader, out io.Writer) {
 		}
 
 		comp := compiler.NewWithState(symbolTable, constants)
-		err, _ := comp.Compile(program)
+		_, err := comp.Compile(program)
 		if err != nil {
 			fmt.Fprintf(out, "Woops! Compilation failed:\n %s\n", err)
 			continue

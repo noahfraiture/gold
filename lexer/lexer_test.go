@@ -39,6 +39,18 @@ while (true) {
   x++
 }
 may x = null
+mint
+endeavouros
+lint
+mstr
+lstr
+marr
+larr
+larry
+mdct
+ldct
+mfun
+lfun
 `
 
 	tests := []struct {
@@ -156,6 +168,18 @@ may x = null
 		{token.IDENT, "x"},
 		{token.ASSIGN, "="},
 		{token.NULL, "null"},
+		{token.MINT, "mint"},
+		{token.MINT, "endeavouros"},
+		{token.LINT, "lint"},
+		{token.MSTR, "mstr"},
+		{token.LSTR, "lstr"},
+		{token.MARR, "marr"},
+		{token.LARR, "larr"},
+		{token.LARR, "larry"},
+		{token.MDCT, "mdct"},
+		{token.LDCT, "ldct"},
+		{token.MFUN, "mfun"},
+		{token.LFUN, "lfun"},
 		{token.EOF, ""},
 	}
 

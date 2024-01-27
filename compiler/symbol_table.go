@@ -1,5 +1,7 @@
 package compiler
 
+import "gold/object"
+
 type SymbolScope string
 
 const (
@@ -16,8 +18,8 @@ type Symbol struct {
 
 	// NOTE : number of symbol in the table. Index when the VM will
 	// add the symbol in its list of symbol in the correct scope.
-	Index    int
-	Nullable bool
+	Index      int
+	ObjectInfo object.Attribute
 }
 
 type SymbolTable struct {
@@ -41,8 +43,8 @@ func NewSymbolTable() *SymbolTable {
 	return &SymbolTable{store: s, FreeSymbols: free}
 }
 
-func (s *SymbolTable) Define(name string, nullable bool) Symbol {
-	symbol := Symbol{Name: name, Index: s.numDefinitions, Nullable: nullable}
+func (s *SymbolTable) Define(name string, objectInfo object.Attribute) Symbol {
+	symbol := Symbol{Name: name, Index: s.numDefinitions, ObjectInfo: objectInfo}
 	if s.Outer == nil {
 		symbol.Scope = GlobalScope
 	} else {
@@ -66,28 +68,28 @@ func (s *SymbolTable) Resolve(name string) (Symbol, bool) {
 			return obj, ok
 		}
 
-		free := s.defineFree(obj)
+		free := s.defineFree(obj, obj.ObjectInfo)
 		return free, true
 	}
 	return obj, ok
 }
 
-func (s *SymbolTable) DefineBuiltin(index int, name string) Symbol {
-	symbol := Symbol{Name: name, Index: index, Scope: BuiltinScope}
+func (s *SymbolTable) DefineBuiltin(index int, name string, objectInfo object.Attribute) Symbol {
+	symbol := Symbol{Name: name, Index: index, Scope: BuiltinScope, ObjectInfo: objectInfo}
 	s.store[name] = symbol
 	return symbol
 }
 
-func (s *SymbolTable) DefineFunctionName(name string) Symbol {
-	symbol := Symbol{Name: name, Index: 0, Scope: FunctionScope}
+func (s *SymbolTable) DefineFunctionName(name string, objectInfo object.Attribute) Symbol {
+	symbol := Symbol{Name: name, Index: 0, Scope: FunctionScope, ObjectInfo: objectInfo}
 	s.store[name] = symbol
 	return symbol
 }
 
-func (s *SymbolTable) defineFree(original Symbol) Symbol {
+func (s *SymbolTable) defineFree(original Symbol, objectInfo object.Attribute) Symbol {
 	s.FreeSymbols = append(s.FreeSymbols, original)
 
-	symbol := Symbol{Name: original.Name, Index: len(s.FreeSymbols) - 1, Nullable: original.Nullable}
+	symbol := Symbol{Name: original.Name, Index: len(s.FreeSymbols) - 1, ObjectInfo: objectInfo}
 	symbol.Scope = FreeScope
 
 	s.store[original.Name] = symbol

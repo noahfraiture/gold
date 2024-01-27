@@ -55,7 +55,7 @@ func compileFile(inputFileName, outputFileName string) error {
 	p := parser.New(l)
 	program := p.ParseProgram()
 	comp := compiler.New()
-	err, _ = comp.Compile(program)
+	_, err = comp.Compile(program)
 	if err != nil {
 		return err
 	}

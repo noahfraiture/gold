@@ -126,11 +126,28 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseReassignStatement()
 	}
 
-	switch p.curToken.Type {
-	case token.LET:
-		return p.parseLetStatement()
-	case token.MAY:
-		return p.parseMayStatement()
+	var declareStmt *ast.Declare
+	curTokenType := p.curToken.Type
+	switch curTokenType {
+	case token.MARR, token.MDCT, token.MINT, token.MAY, token.MFLT, token.MSTR:
+		declareStmt = p.parseDeclareStatement(true)
+	case token.LARR, token.LDCT, token.LINT, token.LET, token.LFLT, token.LSTR:
+		declareStmt = p.parseDeclareStatement(false)
+	}
+
+	switch curTokenType {
+	case token.MDCT, token.LDCT:
+		return &ast.DctDeclare{Declare: *declareStmt}
+	case token.MFLT, token.LFLT:
+		return &ast.FloatDeclare{Declare: *declareStmt}
+	case token.MARR, token.LARR:
+		return &ast.ArrDeclare{Declare: *declareStmt}
+	case token.MSTR, token.LSTR:
+		return &ast.StrDeclare{Declare: *declareStmt}
+	case token.MINT, token.LINT:
+		return &ast.IntDeclare{Declare: *declareStmt}
+	case token.MAY, token.LET:
+		return &ast.LetDeclare{Declare: *declareStmt}
 	case token.RETURN:
 		return p.parseReturnStatement()
 	default:
@@ -140,9 +157,8 @@ func (p *Parser) parseStatement() ast.Statement {
 
 // === PARSE STATEMENTS ===
 
-// TODO : refactor to use less space
-func (p *Parser) parseLetStatement() *ast.LetStatement {
-	stmt := &ast.LetStatement{Token: p.curToken}
+func (p *Parser) parseDeclareStatement(nullable bool) *ast.Declare {
+	stmt := &ast.Declare{Token: p.curToken, Nullable: nullable}
 
 	if !p.expectPeek(token.IDENT) {
 		return nil
@@ -158,39 +174,6 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 
 	stmt.Value = p.parseExpression(LOWEST)
 
-	// TODO : what is fl ?
-	// next function also
-	if fl, ok := stmt.Value.(*ast.FunctionLiteral); ok {
-		fl.Name = stmt.Name.Value
-	}
-
-	if p.peekTokenIs(token.SEMICOLON) {
-		p.nextToken()
-	}
-
-	return stmt
-}
-
-// TODO : very similar to let, can refactor
-func (p *Parser) parseMayStatement() *ast.MayStatement {
-	stmt := &ast.MayStatement{Token: p.curToken}
-
-	if !p.expectPeek(token.IDENT) {
-		return nil
-	}
-
-	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-
-	if !p.expectPeek(token.ASSIGN) {
-		return nil
-	}
-
-	p.nextToken()
-
-	stmt.Value = p.parseExpression(LOWEST)
-
-	// TODO : what is fl ?
-	// next function also
 	if fl, ok := stmt.Value.(*ast.FunctionLiteral); ok {
 		fl.Name = stmt.Name.Value
 	}

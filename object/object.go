@@ -13,9 +13,15 @@ type BuiltinFunction func(args ...Object) Object
 
 type ObjectType string
 
+type Attribute struct {
+	ObjectType ObjectType
+	Nullable   bool
+}
+
 const (
 	NULL_OBJ  = "NULL"
 	ERROR_OBJ = "ERROR"
+	UNDEFINED = "UNDEFINED"
 
 	INTEGER_OBJ = "INTEGER"
 	FLOAT_OBJ   = "FLOAT"
@@ -34,6 +40,15 @@ const (
 
 	CLOSURE_OBJ = "CLOSURE"
 )
+
+func (info *Attribute) IsTypeOf(s ...ObjectType) bool {
+	for _, c := range s {
+		if info.ObjectType == c || c == UNDEFINED {
+			return true
+		}
+	}
+	return info.ObjectType == UNDEFINED
+}
 
 type HashKey struct {
 	Type  ObjectType

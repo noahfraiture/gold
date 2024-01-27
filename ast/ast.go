@@ -47,16 +47,23 @@ func (p *Program) String() string {
 	return out.String()
 }
 
-// Statements
-type LetStatement struct {
-	Value Expression
-	Name  *Identifier
-	Token token.Token // the token.LET token
+type DeclareStatement interface {
+	GetValue() Expression
+	GetName() *Identifier
+	GetToken() token.Token
 }
 
-func (ls *LetStatement) statementNode()       {}
-func (ls *LetStatement) TokenLiteral() string { return ls.Token.Literal }
-func (ls *LetStatement) String() string {
+// Statements
+type Declare struct {
+	Value    Expression
+	Name     *Identifier
+	Token    token.Token // the token.LET token
+	Nullable bool
+}
+
+func (ls *Declare) statementNode()       {}
+func (ls *Declare) TokenLiteral() string { return ls.Token.Literal }
+func (ls *Declare) String() string {
 	var out bytes.Buffer
 
 	out.WriteString(ls.TokenLiteral() + " ")
@@ -72,30 +79,21 @@ func (ls *LetStatement) String() string {
 	return out.String()
 }
 
-// TODO : again very similar, could refactor this with let
-type MayStatement struct {
-	Value Expression
-	Name  *Identifier
-	Token token.Token // the token.LET token
-}
+func (ls *Declare) GetValue() Expression  { return ls.Value }
+func (ls *Declare) GetName() *Identifier  { return ls.Name }
+func (ls *Declare) GetToken() token.Token { return ls.Token }
 
-func (ms *MayStatement) statementNode()       {}
-func (ms *MayStatement) TokenLiteral() string { return ms.Token.Literal }
-func (ms *MayStatement) String() string {
-	var out bytes.Buffer
+type LetDeclare struct{ Declare }
 
-	out.WriteString(ms.TokenLiteral() + " ")
-	out.WriteString(ms.Name.String())
-	out.WriteString(" = ")
+type IntDeclare struct{ Declare }
 
-	if ms.Value != nil {
-		out.WriteString(ms.Value.String())
-	}
+type FloatDeclare struct{ Declare }
 
-	out.WriteString(";")
+type StrDeclare struct{ Declare }
 
-	return out.String()
-}
+type ArrDeclare struct{ Declare }
+
+type DctDeclare struct{ Declare }
 
 type ReassignStatement struct {
 	Value Expression

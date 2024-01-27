@@ -480,7 +480,7 @@ func TestCallingFunctionsWithWrongArguments(t *testing.T) {
 		program := parse(tt.input)
 
 		comp := compiler.New()
-		err, _ := comp.Compile(program)
+		_, err := comp.Compile(program)
 		if err != nil {
 			t.Fatalf("compiler error: %s", err)
 		}
@@ -714,7 +714,7 @@ func runVmTests(t *testing.T, tests []vmTestCase) {
 		program := parse(tt.input)
 
 		comp := compiler.New()
-		err, _ := comp.Compile(program)
+		_, err := comp.Compile(program)
 		if err != nil {
 			t.Fatalf("compiler error: %s", err)
 		}

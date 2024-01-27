@@ -77,7 +77,7 @@ func TestCompilerScopes(t *testing.T) {
 func TestNumberArithmetic(t *testing.T) {
 	tests := []compilerTestCase{
 		{
-			input:             "1 + 2",
+			input:             "1 + 2", // TODO : wrong order. Why
 			expectedConstants: []interface{}{1, 2},
 			expectedInstructions: []code.Instructions{
 				code.Make(code.OpConstant, 0),
@@ -180,7 +180,7 @@ func TestVariablesInc(t *testing.T) {
 			},
 		},
 		{
-			input:             "let x = 0; ++x",
+			input:             "lint x = 0; ++x",
 			expectedConstants: []interface{}{0},
 			expectedInstructions: []code.Instructions{
 				code.Make(code.OpConstant, 0),
@@ -193,7 +193,7 @@ func TestVariablesInc(t *testing.T) {
 			},
 		},
 		{
-			input:             "let x = 0; --x",
+			input:             "mint x = 0; --x",
 			expectedConstants: []interface{}{0},
 			expectedInstructions: []code.Instructions{
 				code.Make(code.OpConstant, 0),
@@ -1273,25 +1273,26 @@ func TestRecursiveFunctions(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
-func TestNullableExpression(t *testing.T) {
+func TestWrongDeclarationExpression(t *testing.T) {
+	// TODO : more tests
 	tests := []compilerTestError{
 		{
 			input:           `let x = null`,
-			expectedMessage: fmt.Errorf("can't use 'let' statement with null"),
+			expectedMessage: fmt.Errorf("null value error : 'x' is not nullable"),
 		},
 		{
 			input: `
       let x = 0
       x = null
       `,
-			expectedMessage: fmt.Errorf("your value is not nullable"),
+			expectedMessage: fmt.Errorf("null value error : 'x' is not nullable"),
 		},
 		{
 			input: `
       let x = 0
       x = if (true) {3}
       `,
-			expectedMessage: fmt.Errorf("your value is not nullable"),
+			expectedMessage: fmt.Errorf("null value error : 'x' is not nullable"),
 		},
 		{
 			input: `
@@ -1301,7 +1302,7 @@ func TestNullableExpression(t *testing.T) {
       }
       x = f()
       `,
-			expectedMessage: fmt.Errorf("your value is not nullable"),
+			expectedMessage: fmt.Errorf("null value error : 'x' is not nullable"),
 		},
 		{
 			input: `
@@ -1317,22 +1318,23 @@ func TestNullableExpression(t *testing.T) {
       }
       x = f()
       `,
-			expectedMessage: fmt.Errorf("your value is not nullable"),
+			expectedMessage: fmt.Errorf("null value error : 'x' is not nullable"),
 		},
 		{
-			input: `
-      let x = while (true) {return 1}
-      `,
-			expectedMessage: fmt.Errorf("can't use 'let' statement with null"),
+			input:           `lint x = null`,
+			expectedMessage: fmt.Errorf("null value error : 'x' is not nullable"),
 		},
 		{
-			input: `
-      let f = fn(a, b) {
-        return a + b
-      }
-      let x = f(null, 2)
-      `,
-			expectedMessage: fmt.Errorf("can't use 'let' statement with null"),
+			input:           `mint x = "hey"`,
+			expectedMessage: fmt.Errorf("wrong type used : 'x' expect type 'INTEGER' but got 'STRING'"),
+		},
+		{
+			input:           `lstr x = [1, 2]`,
+			expectedMessage: fmt.Errorf("wrong type used : 'x' expect type 'STRING' but got 'ARRAY'"),
+		},
+		{
+			input:           `x = 1`,
+			expectedMessage: fmt.Errorf("undefined variable : 'x'"),
 		},
 	}
 
@@ -1481,9 +1483,9 @@ func runCompilerTestsError(t *testing.T, tests []compilerTestError) {
 		program := parse(tt.input)
 
 		compiler := New()
-		err, _ := compiler.Compile(program)
+		_, err := compiler.Compile(program)
 		if err == nil {
-			t.Fatalf("compiler did not produce error, got ")
+			t.Fatalf("compiler did not produce error, input=%q, want=%q", tt.input, tt.expectedMessage)
 		}
 
 		if err.Error() != tt.expectedMessage.Error() {
@@ -1505,7 +1507,7 @@ func runCompilerTests(t *testing.T, tests []compilerTestCase) {
 		program := parse(tt.input)
 
 		compiler := New()
-		err, _ := compiler.Compile(program)
+		_, err := compiler.Compile(program)
 		if err != nil {
 			t.Fatalf("compiler error: %s", err)
 		}
@@ -1519,7 +1521,11 @@ func runCompilerTests(t *testing.T, tests []compilerTestCase) {
 
 		err = testConstants(t, tt.expectedConstants, bytecode.Constants)
 		if err != nil {
-			t.Fatalf("testConstants failed: %s", err)
+			t.Fatalf(`
+testConstants failed: %s
+orogram : %s
+bytecode: %s
+        `, err, program.String(), bytecode)
 		}
 	}
 }

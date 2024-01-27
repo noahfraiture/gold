@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"errors"
 	"fmt"
 	"gold/ast"
 	"gold/code"
@@ -10,12 +9,10 @@ import (
 )
 
 type Compiler struct {
-	constants []object.Object
-
+	constants   []object.Object
 	symbolTable *SymbolTable
-
-	scopes     []CompilationScope
-	scopeIndex int
+	scopes      []CompilationScope
+	scopeIndex  int
 }
 
 func New() *Compiler {
@@ -28,7 +25,7 @@ func New() *Compiler {
 	symbolTable := NewSymbolTable()
 
 	for i, v := range object.Builtins {
-		symbolTable.DefineBuiltin(i, v.Name)
+		symbolTable.DefineBuiltin(i, v.Name, v.Type)
 	}
 
 	return &Compiler{
@@ -49,202 +46,63 @@ func NewWithState(s *SymbolTable, constants []object.Object) *Compiler {
 // Compile : create the bytecode from the instructions in the AST and add it in the compiled instructions.
 // When it encounters an Integer or a function, add it on the pool of constant. To query it
 // we use the index in the constant pool and the op opConstant.
-func (c *Compiler) Compile(node ast.Node) (error, map[object.ObjectType]bool) {
+func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 	var err error
-	objectTypeSet := make(map[object.ObjectType]bool)
+	infos := object.Attribute{}
 	switch node := node.(type) {
+
+	// === MAIN ===
 	case *ast.Program:
 		for _, s := range node.Statements {
-			err, objectTypeSet = c.Compile(s)
+			infos, err = c.Compile(s)
 			if err != nil {
-				return err, objectTypeSet
+				return infos, err
 			}
 		}
 
 	case *ast.ExpressionStatement:
-		err, objectTypeSet = c.Compile(node.Expression)
+		infos, err = c.Compile(node.Expression)
 		if err != nil {
-			return err, objectTypeSet
+			return infos, err
 		}
 		c.emit(code.OpPop)
 
-	case *ast.InfixExpression:
-		// This separate case reverse the order of right and left. With that we can use the same opCode for < and >
-		// TODO : check type everywhere
-
-		if node.Operator == "<" || node.Operator == "<=" {
-			err, rightObjectTypeSet := c.Compile(node.Right)
+	case *ast.BlockStatement:
+		for _, s := range node.Statements {
+			tmpobjectTypeSet, err := c.Compile(s)
 			if err != nil {
-				return err, objectTypeSet
-			}
-			for k, v := range rightObjectTypeSet {
-				objectTypeSet[k] = v
+				return infos, err
 			}
 
-			err, leftObjectTypeSet := c.Compile(node.Left)
-			if err != nil {
-				return err, objectTypeSet
-			}
-			for k, v := range leftObjectTypeSet {
-				objectTypeSet[k] = v
+			if infos.ObjectType == "" {
+				infos.ObjectType = tmpobjectTypeSet.ObjectType
+				continue
 			}
 
-			if node.Operator == "<" {
-				c.emit(code.OpGreaterThan)
-			} else {
-				c.emit(code.OpGreaterEqualThan)
+			if tmpobjectTypeSet.ObjectType == "" {
+				continue
 			}
-			return nil, objectTypeSet
+
+			if !infos.IsTypeOf(tmpobjectTypeSet.ObjectType) {
+				return infos, fmt.Errorf("block statement can return different types. old=%s current=%s",
+					infos.ObjectType, tmpobjectTypeSet.ObjectType)
+			}
 		}
 
-		err, leftObjectTypeSet := c.Compile(node.Left)
-		if err != nil {
-			return err, objectTypeSet
-		}
-		for k, v := range leftObjectTypeSet {
-			objectTypeSet[k] = v
-		}
-
-		err, rightObjectTypeSet := c.Compile(node.Right)
-		if err != nil {
-			return err, objectTypeSet
-		}
-		for k, v := range rightObjectTypeSet {
-			objectTypeSet[k] = v
-		}
-
-		switch node.Operator {
-		case "+":
-			c.emit(code.OpAdd)
-		case "-":
-			c.emit(code.OpSub)
-		case "*":
-			c.emit(code.OpMul)
-		case "/":
-			c.emit(code.OpDiv)
-		case ">":
-			c.emit(code.OpGreaterThan)
-		case ">=":
-			c.emit(code.OpGreaterEqualThan)
-		case "==":
-			c.emit(code.OpEqual)
-		case "!=":
-			c.emit(code.OpNotEqual)
-		default:
-			return fmt.Errorf("unknown operator %s", node.Operator), objectTypeSet
-		}
-
-	case *ast.IntegerLiteral:
-		integer := &object.Integer{Value: node.Value}
-		c.emit(code.OpConstant, c.addConstant(integer))
-
-	case *ast.FloatLiteral:
-		float := &object.Float{Value: node.Value}
-		c.emit(code.OpConstant, c.addConstant(float))
-
-	case *ast.IncPostExpression:
-		// Compile twice to have two OpGet to still have one after modification
-		symbol, ok := c.symbolTable.Resolve(node.Left.Value)
-		if !ok {
-			return nil, objectTypeSet
-		}
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpGetGlobal, symbol.Index)
-			c.emit(code.OpGetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpGetLocal, symbol.Index)
-			c.emit(code.OpGetLocal, symbol.Index)
-		}
-
-		switch node.Operator {
-		case "++":
-			c.emit(code.OpInc)
-		case "--":
-			c.emit(code.OpDec)
-		default:
-			return fmt.Errorf("unknown operator %s", node.Operator), objectTypeSet
-		}
-
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpSetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpSetLocal, symbol.Index)
-		}
-
-	case *ast.IncPreExpression:
-		// NOTE : could need less code and let OpInc do everything to limit the bytecode
-		// The problem is to choose global or local
-
-		// Compile twice to have two OpGet to still have one after modification
-		symbol, ok := c.symbolTable.Resolve(node.Right.Value)
-		if !ok {
-			return fmt.Errorf("unknown name %s", node.Right.Value), objectTypeSet
-		}
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpGetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpGetLocal, symbol.Index)
-		}
-
-		switch node.Operator {
-		case "++":
-			c.emit(code.OpInc)
-		case "--":
-			c.emit(code.OpDec)
-		default:
-			return fmt.Errorf("unknown operator %s", node.Operator), objectTypeSet
-		}
-
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpSetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpSetLocal, symbol.Index)
-		}
-
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpGetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpGetLocal, symbol.Index)
-		}
-
-	case *ast.Boolean:
-		if node.Value { // True and False aren't in constant pool, there are separate object in VM
-			c.emit(code.OpTrue)
-		} else {
-			c.emit(code.OpFalse)
-		}
-
-	case *ast.Null:
-		c.emit(code.OpNull)
-		objectTypeSet[object.NULL_OBJ] = true
-
-	case *ast.PrefixExpression:
-		err, objectTypeSet = c.Compile(node.Right)
-		if err != nil {
-			return err, objectTypeSet
-		}
-
-		switch node.Operator {
-		case "!":
-			c.emit(code.OpBang)
-		case "-":
-			c.emit(code.OpMinus)
-		default:
-			return fmt.Errorf("unknown operator %s", node.Operator), objectTypeSet
-		}
-
+	// === EXPRESSION ===
 	case *ast.IfExpression:
-		err, _ = c.Compile(node.Condition)
+		// Here we don't check the condition type to accept every truthy type
+		_, err := c.Compile(node.Condition)
 		if err != nil {
-			return err, objectTypeSet
+			return infos, err
 		}
 
 		// Emit an `OpJumpNotTruthy` with a bogus value
 		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
 
-		err, objectTypeSet = c.Compile(node.Consequence)
+		infos, err = c.Compile(node.Consequence)
 		if err != nil {
-			return err, objectTypeSet
+			return infos, err
 		}
 
 		if c.lastInstructionIs(code.OpPop) {
@@ -261,14 +119,22 @@ func (c *Compiler) Compile(node ast.Node) (error, map[object.ObjectType]bool) {
 
 		if node.Alternative == nil {
 			c.emit(code.OpNull)
-			objectTypeSet[object.NULL_OBJ] = true
+			infos.Nullable = true
 		} else {
-			err, altObjectTypeSet := c.Compile(node.Alternative)
-			for k, v := range altObjectTypeSet {
-				objectTypeSet[k] = v
+			altObjectTypeSet, err := c.Compile(node.Alternative)
+			infos.Nullable = altObjectTypeSet.Nullable || infos.Nullable
+			if infos.ObjectType == object.NULL_OBJ {
+				infos.ObjectType = altObjectTypeSet.ObjectType
+			}
+
+			bothExist := altObjectTypeSet.ObjectType != "" && infos.ObjectType != ""
+			sameType := infos.IsTypeOf(altObjectTypeSet.ObjectType)
+
+			if bothExist && !sameType {
+				return infos, fmt.Errorf("consquence=%s must be same type of alternative=%s", infos.ObjectType, altObjectTypeSet.ObjectType)
 			}
 			if err != nil {
-				return err, objectTypeSet
+				return infos, err
 			}
 			if c.lastInstructionIs(code.OpPop) {
 				c.removeLastPop()
@@ -283,16 +149,17 @@ func (c *Compiler) Compile(node ast.Node) (error, map[object.ObjectType]bool) {
 	case *ast.WhileExpression:
 		pos := len(c.currentInstructions())
 
-		err, _ = c.Compile(node.Condition)
+		// Here we don't check the condition type to accept every truthy type
+		_, err := c.Compile(node.Condition)
 		if err != nil {
-			return err, objectTypeSet
+			return infos, err
 		}
 
 		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
 
-		err, _ = c.Compile(node.Consequence)
+		_, err = c.Compile(node.Consequence) // NOTE : will have to get the infos when while return value. How to ignore return and only take break return value?
 		if err != nil {
-			return err, objectTypeSet
+			return infos, err
 		}
 
 		c.emit(code.OpJump, pos)
@@ -301,63 +168,130 @@ func (c *Compiler) Compile(node ast.Node) (error, map[object.ObjectType]bool) {
 		c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
 
 		c.emit(code.OpNull) // NOTE : since it's an expression, must produce a value
-		objectTypeSet[object.NULL_OBJ] = true
+		infos.Nullable = true
 
-	case *ast.BlockStatement:
-		for _, s := range node.Statements {
-			err, tmpobjectTypeSet := c.Compile(s)
-			for k, v := range tmpobjectTypeSet {
-				objectTypeSet[k] = v
-			}
+	case *ast.InfixExpression:
+		// This separate case reverse the order of right and left. With that we can use the same opCode for < and >
+
+		var rightInfos object.Attribute
+		var leftInfos object.Attribute
+		var err error
+
+		if node.Operator == "<" || node.Operator == "<=" {
+
+			leftInfos, err = c.Compile(node.Right)
 			if err != nil {
-				return err, objectTypeSet
+				return infos, err
+			}
+
+			rightInfos, err = c.Compile(node.Left)
+			if err != nil {
+				return infos, err
+			}
+
+		} else {
+			leftInfos, err = c.Compile(node.Left)
+			if err != nil {
+				return infos, err
+			}
+
+			rightInfos, err = c.Compile(node.Right)
+			if err != nil {
+				return infos, err
 			}
 		}
 
-	case *ast.LetStatement:
-		symbol := c.symbolTable.Define(node.Name.Value, false)
-		err, objectTypeSet = c.Compile(node.Value)
-		if err != nil {
-			return err, objectTypeSet
+		bothInteger := rightInfos.IsTypeOf(object.INTEGER_OBJ) && leftInfos.IsTypeOf(object.INTEGER_OBJ)
+		bothNumber := rightInfos.IsTypeOf(object.INTEGER_OBJ, object.FLOAT_OBJ) && leftInfos.IsTypeOf(object.INTEGER_OBJ, object.FLOAT_OBJ)
+		bothString := rightInfos.IsTypeOf(object.STRING_OBJ) && leftInfos.IsTypeOf(object.STRING_OBJ)
+
+		switch node.Operator {
+		case "+", "-", "*", "/":
+			if bothInteger {
+				infos.ObjectType = object.INTEGER_OBJ
+			} else if bothNumber {
+				infos.ObjectType = object.FLOAT_OBJ
+			} else if bothString {
+				infos.ObjectType = object.STRING_OBJ
+			}
+		case ">", "<", ">=", "<=", "==", "!=":
+			infos.ObjectType = object.BOOLEAN_OBJ
 		}
 
-		if _, ok := objectTypeSet[object.NULL_OBJ]; ok {
-			return errors.New("can't use 'let' statement with null"), objectTypeSet
+		switch node.Operator {
+		case "+":
+			if !bothString && !bothNumber {
+				return infos, fmt.Errorf("trying to do '%s' with other than numbers or string. left=%s right=%s",
+					node.Operator, leftInfos.ObjectType, rightInfos.ObjectType)
+			}
+			c.emit(code.OpAdd)
+		case "-":
+			if !bothNumber {
+				return infos, fmt.Errorf("trying to do '%s' with other than numbers. left=%s right=%s",
+					node.Operator, leftInfos.ObjectType, rightInfos.ObjectType)
+			}
+			c.emit(code.OpSub)
+		case "*":
+			if !bothNumber {
+				return infos, fmt.Errorf("trying to do '%s' with other than numbers. left=%v right=%v",
+					node.Operator, leftInfos.ObjectType, rightInfos.ObjectType)
+			}
+			c.emit(code.OpMul)
+		case "/":
+			if !bothNumber {
+				return infos, fmt.Errorf("trying to do '%s' with other than numbers. left=%s right=%s",
+					node.Operator, leftInfos.ObjectType, rightInfos.ObjectType)
+			}
+			c.emit(code.OpDiv)
+		case ">", "<":
+			if !bothString && !bothNumber {
+				return infos, fmt.Errorf("trying to do '%s' with other than numbers or string. left=%s right=%s",
+					node.Operator, leftInfos.ObjectType, rightInfos.ObjectType)
+			}
+			c.emit(code.OpGreaterThan)
+		case ">=", "<=":
+			if !bothString && !bothNumber {
+				return infos, fmt.Errorf("trying to do '%s' with other than numbers or string. left=%s right=%s",
+					node.Operator, leftInfos.ObjectType, rightInfos.ObjectType)
+			}
+			c.emit(code.OpGreaterEqualThan)
+		case "==":
+			c.emit(code.OpEqual)
+		case "!=":
+			c.emit(code.OpNotEqual)
+		default:
+			return infos, fmt.Errorf("unknown operator '%s'", node.Operator)
 		}
 
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpSetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpSetLocal, symbol.Index)
-		}
+		// NOTE : is a new structure, is it needed ? could reuse prefix and create postfilx
 
-	case *ast.MayStatement:
-		// TODO : again very similar to let, can refactor
-		symbol := c.symbolTable.Define(node.Name.Value, true)
-		err, _ = c.Compile(node.Value)
-		if err != nil {
-			return err, objectTypeSet
-		}
-
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpSetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpSetLocal, symbol.Index)
-		}
-
-	case *ast.ReassignStatement:
-		symbol, ok := c.symbolTable.Resolve(node.Name.Value)
+	case *ast.IncPostExpression:
+		// Compile twice to have two OpGet to still have one after modification
+		symbol, ok := c.symbolTable.Resolve(node.Left.Value)
 		if !ok {
-			return errors.New("undefined variable " + node.Name.Value), objectTypeSet
-		}
-		err, objectTypeSet = c.Compile(node.Value)
-		if err != nil {
-			return err, objectTypeSet
+			return infos, nil
 		}
 
-		var canReturnNull bool
-		if _, canReturnNull = objectTypeSet[object.NULL_OBJ]; !symbol.Nullable && canReturnNull {
-			return errors.New("your value is not nullable"), objectTypeSet
+		if !symbol.ObjectInfo.IsTypeOf(object.INTEGER_OBJ, object.FLOAT_OBJ) {
+			return infos, fmt.Errorf("trying to do '%s' on other than numbers. symbol=%s", node.Operator, symbol.ObjectInfo.ObjectType)
+		}
+		infos = symbol.ObjectInfo
+
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpGetGlobal, symbol.Index)
+			c.emit(code.OpGetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpGetLocal, symbol.Index)
+			c.emit(code.OpGetLocal, symbol.Index)
+		}
+
+		switch node.Operator {
+		case "++":
+			c.emit(code.OpInc)
+		case "--":
+			c.emit(code.OpDec)
+		default:
+			return infos, fmt.Errorf("unknown operator %s", node.Operator)
 		}
 
 		if symbol.Scope == GlobalScope {
@@ -366,32 +300,131 @@ func (c *Compiler) Compile(node ast.Node) (error, map[object.ObjectType]bool) {
 			c.emit(code.OpSetLocal, symbol.Index)
 		}
 
-	case *ast.Identifier:
-		symbol, ok := c.symbolTable.Resolve(node.Value)
+	case *ast.IncPreExpression:
+		// NOTE : could need less code and let OpInc do everything to limit the bytecode
+		// The problem is to choose global or local
+
+		// Compile twice to have two OpGet to still have one after modification
+		symbol, ok := c.symbolTable.Resolve(node.Right.Value)
 		if !ok {
-			return fmt.Errorf("undefined variable %s", node.Value), objectTypeSet
+			return infos, fmt.Errorf("unknown name %s", node.Right.Value)
 		}
 
-		c.loadSymbol(symbol)
-		if symbol.Nullable {
-			objectTypeSet[object.NULL_OBJ] = true
+		if !symbol.ObjectInfo.IsTypeOf(object.INTEGER_OBJ, object.FLOAT_OBJ) {
+			return infos, fmt.Errorf("trying to do '%s' on other than numbers. symbol=%s", node.Operator, symbol.ObjectInfo.ObjectType)
 		}
+
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpGetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpGetLocal, symbol.Index)
+		}
+
+		switch node.Operator {
+		case "++":
+			c.emit(code.OpInc)
+		case "--":
+			c.emit(code.OpDec)
+		default:
+			return infos, fmt.Errorf("unknown operator %s", node.Operator)
+		}
+		infos = symbol.ObjectInfo
+
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpSetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
+		}
+
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpGetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpGetLocal, symbol.Index)
+		}
+
+	case *ast.PrefixExpression:
+		infos, err = c.Compile(node.Right)
+		if err != nil {
+			return infos, err
+		}
+
+		switch node.Operator {
+		case "!":
+			// NOTE : every value can be truthy, so we don't check type
+			c.emit(code.OpBang)
+		case "-":
+			if !infos.IsTypeOf(object.INTEGER_OBJ, object.FLOAT_OBJ) {
+				return infos, fmt.Errorf("trying to do '%s' on other than numbers", node.Operator)
+			}
+			c.emit(code.OpMinus)
+		default:
+			return infos, fmt.Errorf("unknown operator %s", node.Operator)
+		}
+
+	case *ast.IndexExpression:
+		// NOTE : since array and map accept anything, it's impossible to define a  type
+		implemInfos, err := c.Compile(node.Left)
+		if err != nil {
+			return infos, err
+		}
+		if !implemInfos.IsTypeOf(object.ARRAY_OBJ, object.HASH_OBJ) {
+			return infos, fmt.Errorf("trying to index something other than array or hash")
+		}
+
+		indexInfos, err := c.Compile(node.Index)
+		if err != nil {
+			return infos, err
+		}
+		if indexInfos.ObjectType != object.INTEGER_OBJ {
+			return infos, fmt.Errorf("trying to index with non integer")
+		}
+
+		c.emit(code.OpIndex)
+		infos.ObjectType = object.UNDEFINED
+
+	// === VALUE ===
+	case *ast.IntegerLiteral:
+		integer := &object.Integer{Value: node.Value}
+		c.emit(code.OpConstant, c.addConstant(integer))
+		infos.ObjectType = object.INTEGER_OBJ
+
+	case *ast.FloatLiteral:
+		float := &object.Float{Value: node.Value}
+		c.emit(code.OpConstant, c.addConstant(float))
+		infos.ObjectType = object.FLOAT_OBJ
+
+	case *ast.Boolean:
+		if node.Value { // True and False aren't in constant pool, there are separate object in VM
+			c.emit(code.OpTrue)
+		} else {
+			c.emit(code.OpFalse)
+		}
+		infos.ObjectType = object.BOOLEAN_OBJ
+
+	case *ast.Null:
+		c.emit(code.OpNull)
+		infos.Nullable = true
+		infos.ObjectType = object.NULL_OBJ
 
 	case *ast.StringLiteral:
 		str := &object.String{Value: node.Value}
 		c.emit(code.OpConstant, c.addConstant(str))
+		infos.ObjectType = object.STRING_OBJ
 
 	case *ast.ArrayLiteral:
+		// NOTE : currently allow nullable value without any trouble
 		for _, el := range node.Elements {
-			err, _ = c.Compile(el)
+			_, err = c.Compile(el)
 			if err != nil {
-				return err, objectTypeSet
+				return infos, err
 			}
 		}
 
 		c.emit(code.OpArray, len(node.Elements))
+		infos.ObjectType = object.ARRAY_OBJ
 
 	case *ast.HashLiteral:
+		// NOTE : currently allow nullable value without any trouble
 		keys := []ast.Expression{}
 		for k := range node.Pairs {
 			keys = append(keys, k)
@@ -402,46 +435,120 @@ func (c *Compiler) Compile(node ast.Node) (error, map[object.ObjectType]bool) {
 
 		for _, k := range keys {
 			// TODO : check nullable
-			err, _ = c.Compile(k)
+			_, err = c.Compile(k)
 			if err != nil {
-				return err, objectTypeSet
+				return infos, err
 			}
-			err, _ = c.Compile(node.Pairs[k])
+			_, err = c.Compile(node.Pairs[k])
 			if err != nil {
-				return err, objectTypeSet
+				return infos, err
 			}
 		}
 
 		c.emit(code.OpHash, len(node.Pairs)*2)
+		infos.ObjectType = object.HASH_OBJ
 
-	case *ast.IndexExpression:
-		// TODO : error if null ?
-		err, objectTypeSet = c.Compile(node.Left)
+	// === DECLARE ===
+	case *ast.LetDeclare:
+		infos, err = c.Compile(node.Value)
 		if err != nil {
-			return err, objectTypeSet
+			return infos, err
 		}
 
-		err, objectTypeSet = c.Compile(node.Index)
-		if err != nil {
-			return err, objectTypeSet
+		if infos.Nullable && !node.Nullable {
+			return infos, errorNullable(node.Name.Value)
 		}
 
-		c.emit(code.OpIndex)
+		symbol := c.symbolTable.Define(node.Name.Value, object.Attribute{Nullable: node.Nullable, ObjectType: infos.ObjectType})
+
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpSetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
+		}
+
+	case *ast.IntDeclare:
+		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.INTEGER_OBJ)
+		if err != nil {
+			return infos, err
+		}
+
+	case *ast.FloatDeclare:
+		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.FLOAT_OBJ)
+		if err != nil {
+			return infos, err
+		}
+
+	case *ast.StrDeclare:
+		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.STRING_OBJ)
+		if err != nil {
+			return infos, err
+		}
+
+	case *ast.ArrDeclare:
+		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.ARRAY_OBJ)
+		if err != nil {
+			return infos, err
+		}
+
+	case *ast.DctDeclare:
+		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.HASH_OBJ)
+		if err != nil {
+			return infos, err
+		}
+
+	case *ast.ReassignStatement:
+		symbol, ok := c.symbolTable.Resolve(node.Name.Value)
+		if !ok {
+			return infos, errorUndefined(node.Name.Value)
+		}
+		infos, err = c.Compile(node.Value)
+		if err != nil {
+			return infos, err
+		}
+
+		if !symbol.ObjectInfo.Nullable && infos.Nullable {
+			return infos, errorNullable(symbol.Name)
+		}
+
+		if !infos.IsTypeOf(symbol.ObjectInfo.ObjectType) {
+			return infos, errorType(symbol.Name, symbol.ObjectInfo.ObjectType, infos.ObjectType)
+		}
+
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpSetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
+		}
+
+	// === IDENTIFIER ===
+
+	case *ast.Identifier:
+		symbol, ok := c.symbolTable.Resolve(node.Value)
+		if !ok {
+			return infos, fmt.Errorf("undefined variable %s", node.Value)
+		}
+
+		c.loadSymbol(symbol)
+		infos = symbol.ObjectInfo
 
 	case *ast.FunctionLiteral:
 		c.enterScope()
 
 		if node.Name != "" {
-			c.symbolTable.DefineFunctionName(node.Name)
+			// UNDEFINED since the function itself has no type but the variabe associated has.
+			// But if we decide to modify the definition to include a type, it can be add there.
+			c.symbolTable.DefineFunctionName(node.Name, object.Attribute{ObjectType: object.UNDEFINED, Nullable: false})
 		}
 
+		// TODO : function accept arguments of any type and function
 		for _, p := range node.Parameters {
-			c.symbolTable.Define(p.Value, true)
+			c.symbolTable.Define(p.Value, object.Attribute{ObjectType: object.UNDEFINED, Nullable: true})
 		}
 
-		err, objectTypeSet = c.Compile(node.Body)
+		infos, err = c.Compile(node.Body)
 		if err != nil {
-			return err, objectTypeSet
+			return infos, err
 		}
 
 		if !c.lastInstructionIs(code.OpReturn) {
@@ -467,31 +574,31 @@ func (c *Compiler) Compile(node ast.Node) (error, map[object.ObjectType]bool) {
 		c.emit(code.OpClosure, fnIndex, len(freeSymbols))
 
 	case *ast.ReturnStatement:
-		err, objectTypeSet = c.Compile(node.ReturnValue)
+		infos, err = c.Compile(node.ReturnValue)
 		if err != nil {
-			return err, objectTypeSet
+			return infos, err
 		}
 
 		c.emit(code.OpReturn)
 
 	case *ast.CallExpression:
-		err, objectTypeSet = c.Compile(node.Function)
+		infos, err = c.Compile(node.Function)
 		if err != nil {
-			return err, objectTypeSet
+			return infos, err
 		}
 
 		for _, a := range node.Arguments {
-			err, _ = c.Compile(a)
+			// TODO : we ignore the type since arguments have to particular type
+			_, err := c.Compile(a)
 			if err != nil {
-				return err, objectTypeSet
+				return infos, err
 			}
 		}
 
 		c.emit(code.OpCall, len(node.Arguments))
-
 	}
 
-	return err, objectTypeSet
+	return infos, err
 }
 
 func (c *Compiler) Bytecode() *Bytecode {
@@ -606,6 +713,50 @@ func (c *Compiler) loadSymbol(s Symbol) {
 	case FunctionScope:
 		c.emit(code.OpCurrentClosure)
 	}
+}
+
+func (c *Compiler) compileDeclare(
+	nodeName string, nullable bool, nodeValue ast.Node, objectType object.ObjectType,
+) error {
+	infos, err := c.Compile(nodeValue)
+	if err != nil {
+		return err
+	}
+
+	if infos.Nullable && !nullable {
+		return errorNullable(nodeName)
+	}
+
+	symbol := c.symbolTable.Define(
+		nodeName,
+		object.Attribute{ObjectType: objectType, Nullable: nullable},
+	)
+
+	if infos.ObjectType != symbol.ObjectInfo.ObjectType {
+		return errorType(nodeName, symbol.ObjectInfo.ObjectType, infos.ObjectType)
+	}
+	if symbol.Scope == GlobalScope {
+		c.emit(code.OpSetGlobal, symbol.Index)
+	} else {
+		c.emit(code.OpSetLocal, symbol.Index)
+	}
+	return nil
+}
+
+func errorUndefined(name string) error {
+	return fmt.Errorf("undefined variable : '%s'", name)
+}
+
+func errorNullable(name string) error {
+	return fmt.Errorf("null value error : '%s' is not nullable", name)
+}
+
+func errorType(name string, expected, got object.ObjectType) error {
+	return fmt.Errorf("wrong type used : '%s' expect type '%s' but got '%s'", name, expected, got)
+}
+
+func errorCondition(objectType object.ObjectType) error {
+	return fmt.Errorf("trying to use '%v' as condition", objectType)
 }
 
 type Bytecode struct {

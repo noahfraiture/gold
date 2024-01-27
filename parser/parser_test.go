@@ -4,18 +4,45 @@ import (
 	"fmt"
 	"gold/ast"
 	"gold/lexer"
+	"strings"
 	"testing"
 )
 
-func TestLetStatements(t *testing.T) {
+const (
+	LET int = iota
+	INT
+	FLOAT
+	STR
+	ARR
+	DCT
+)
+
+func TestDeclareStatements(t *testing.T) {
 	tests := []struct {
 		input              string
 		expectedIdentifier string
-		expectedValue      interface{}
+		expectedValue      any
+		nullable           bool
+		explicitType       int
 	}{
-		{"let x = 5;", "x", 5},
-		{"let y = true;", "y", true},
-		{"let foobar = y;", "foobar", "y"},
+		{"let x = 5;", "x", 5, false, LET},
+		{"let y = true;", "y", true, false, LET},
+		{"let foobar = y;", "foobar", "y", false, LET},
+		{"may x = 5;", "x", 5, true, LET},
+		{"may y = true;", "y", true, true, LET},
+		{"may foobar = y;", "foobar", "y", true, LET},
+		{"mint x = 5;", "x", 5, true, INT},
+		{"lint x = 5;", "x", 5, false, INT},
+		{"endeavouros x = 5;", "x", 5, true, INT},
+		{"mflt x = 5.0;", "x", 5.0, true, FLOAT},
+		{"lflt x = 5.0;", "x", 5.0, false, FLOAT},
+		{"mstr x = 5", "x", 5, true, STR},
+		{"lstr x = 5", "x", 5, false, STR},
+		{`marr x = 5`, "x", 5, true, ARR},
+		{`larr x = 5`, "x", 5, false, ARR},
+		{`larry x = 5`, "x", 5, false, ARR},
+		{`mdct x = 5`, "x", 5, true, DCT},
+		{`ldct x = 5`, "x", 5, false, DCT},
 	}
 
 	for _, tt := range tests {
@@ -25,51 +52,45 @@ func TestLetStatements(t *testing.T) {
 		checkParserErrors(t, p)
 
 		if len(program.Statements) != 1 {
-			t.Fatalf("program.Statements does not contain 1 statements. got=%d",
-				len(program.Statements))
+			t.Fatalf("program.Statements does not contain 1 statements. got=%d", len(program.Statements))
 		}
 
 		stmt := program.Statements[0]
-		if !testLetStatement(t, stmt, tt.expectedIdentifier) {
-			return
+		declareKeyword := strings.Split(tt.input, " ")[0]
+		var val ast.Expression
+		switch tt.explicitType {
+		case LET:
+			if !testDeclare[*ast.LetDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
+				return
+			}
+			val = stmt.(*ast.LetDeclare).Value
+		case INT:
+			if !testDeclare[*ast.IntDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
+				return
+			}
+			val = stmt.(*ast.IntDeclare).Value
+		case FLOAT:
+			if !testDeclare[*ast.FloatDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
+				return
+			}
+			val = stmt.(*ast.FloatDeclare).Value
+		case STR:
+			if !testDeclare[*ast.StrDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
+				return
+			}
+			val = stmt.(*ast.StrDeclare).Value
+		case ARR:
+			if !testDeclare[*ast.ArrDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
+				return
+			}
+			val = stmt.(*ast.ArrDeclare).Value
+		case DCT:
+			if !testDeclare[*ast.DctDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
+				return
+			}
+			val = stmt.(*ast.DctDeclare).Value
 		}
 
-		val := stmt.(*ast.LetStatement).Value
-		if !testLiteralExpression(t, val, tt.expectedValue) {
-			return
-		}
-	}
-}
-
-// TODO : again very similar
-func TestMayStatements(t *testing.T) {
-	tests := []struct {
-		input              string
-		expectedIdentifier string
-		expectedValue      interface{}
-	}{
-		{"may x = 5;", "x", 5},
-		{"may y = true;", "y", true},
-		{"may foobar = y;", "foobar", "y"},
-	}
-
-	for _, tt := range tests {
-		l := lexer.New(tt.input)
-		p := New(l)
-		program := p.ParseProgram()
-		checkParserErrors(t, p)
-
-		if len(program.Statements) != 1 {
-			t.Fatalf("program.Statements does not contain 1 statements. got=%d",
-				len(program.Statements))
-		}
-
-		stmt := program.Statements[0]
-		if !testMayStatement(t, stmt, tt.expectedIdentifier) {
-			return
-		}
-
-		val := stmt.(*ast.MayStatement).Value
 		if !testLiteralExpression(t, val, tt.expectedValue) {
 			return
 		}
@@ -1168,7 +1189,7 @@ func TestFunctionLiteralWithName(t *testing.T) {
 			1, len(program.Statements))
 	}
 
-	stmt, ok := program.Statements[0].(*ast.LetStatement)
+	stmt, ok := program.Statements[0].(*ast.LetDeclare)
 	if !ok {
 		t.Fatalf("program.Statements[0] is not ast.LetStatement. got=%T",
 			program.Statements[0])
@@ -1186,52 +1207,26 @@ func TestFunctionLiteralWithName(t *testing.T) {
 	}
 }
 
-func testLetStatement(t *testing.T, s ast.Statement, name string) bool {
-	if s.TokenLiteral() != "let" {
-		t.Errorf("s.TokenLiteral not 'let'. got=%q", s.TokenLiteral())
+func testDeclare[T ast.DeclareStatement](t *testing.T, s ast.Statement, name, keyword string, nullable bool) bool {
+	if s.TokenLiteral() != keyword {
+		t.Errorf("s.TokenLiteral not '%s'. got=%q", keyword, s.TokenLiteral())
 		return false
 	}
 
-	letStmt, ok := s.(*ast.LetStatement)
+	declareStmt, ok := s.(T)
 	if !ok {
-		t.Errorf("s not *ast.LetStatement. got=%T", s)
+		t.Errorf("s not keyword statement. got=%T", s)
 		return false
 	}
 
-	if letStmt.Name.Value != name {
-		t.Errorf("letStmt.Name.Value not '%s'. got=%s", name, letStmt.Name.Value)
+	if declareStmt.GetName().Value != name {
+		t.Errorf("declareStmt.GetName().Value not '%s'. got=%s", name, declareStmt.GetName().Value)
 		return false
 	}
 
-	if letStmt.Name.TokenLiteral() != name {
-		t.Errorf("letStmt.Name.TokenLiteral() not '%s'. got=%s",
-			name, letStmt.Name.TokenLiteral())
-		return false
-	}
-
-	return true
-}
-
-func testMayStatement(t *testing.T, s ast.Statement, name string) bool {
-	if s.TokenLiteral() != "may" {
-		t.Errorf("s.TokenLiteral not 'may'. got=%q", s.TokenLiteral())
-		return false
-	}
-
-	mayStmt, ok := s.(*ast.MayStatement)
-	if !ok {
-		t.Errorf("s not *ast.MayStatement. got=%T", s)
-		return false
-	}
-
-	if mayStmt.Name.Value != name {
-		t.Errorf("mayStmt.Name.Value not '%s'. got=%s", name, mayStmt.Name.Value)
-		return false
-	}
-
-	if mayStmt.Name.TokenLiteral() != name {
-		t.Errorf("mayStmt.Name.TokenLiteral() not '%s'. got=%s",
-			name, mayStmt.Name.TokenLiteral())
+	if declareStmt.GetName().TokenLiteral() != name {
+		t.Errorf("declareStmt.GetName().TokenLiteral() not '%s'. got=%s",
+			name, declareStmt.GetName().TokenLiteral())
 		return false
 	}
 
@@ -1294,11 +1289,15 @@ func testLiteralExpression(
 	exp ast.Expression,
 	expected interface{},
 ) bool {
+	// TODO : can't take care of string since identifier method is also a string and it's annoying
+	// TODO : take care of array and so
 	switch v := expected.(type) {
 	case int:
 		return testIntegerLiteral(t, exp, int64(v))
 	case int64:
-		return testIntegerLiteral(t, exp, v)
+		return testIntegerLiteral(t, exp, int64(v))
+	case float64:
+		return testFloatLiteral(t, exp, float64(v))
 	case string:
 		return testIdentifier(t, exp, v)
 	case bool:
@@ -1322,6 +1321,27 @@ func testIntegerLiteral(t *testing.T, il ast.Expression, value int64) bool {
 
 	if integ.TokenLiteral() != fmt.Sprintf("%d", value) {
 		t.Errorf("integ.TokenLiteral not %d. got=%s", value,
+			integ.TokenLiteral())
+		return false
+	}
+
+	return true
+}
+
+func testFloatLiteral(t *testing.T, il ast.Expression, value float64) bool {
+	integ, ok := il.(*ast.FloatLiteral)
+	if !ok {
+		t.Errorf("il not *ast.FloatLiteral. got=%T", il)
+		return false
+	}
+
+	if integ.Value != value {
+		t.Errorf("integ.Value not %f. got=%f", value, integ.Value)
+		return false
+	}
+
+	if integ.TokenLiteral() != fmt.Sprintf("%.1f", value) {
+		t.Errorf("integ.TokenLiteral not %.1f. got=%s", value,
 			integ.TokenLiteral())
 		return false
 	}
