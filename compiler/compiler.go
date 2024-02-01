@@ -467,6 +467,12 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 			c.emit(code.OpSetLocal, symbol.Index)
 		}
 
+	case *ast.AnyDeclare:
+		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.UNDEFINED) // Will be nullable
+		if err != nil {
+			return infos, err
+		}
+
 	case *ast.IntDeclare:
 		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.INTEGER_OBJ)
 		if err != nil {

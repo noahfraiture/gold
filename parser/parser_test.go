@@ -15,6 +15,7 @@ const (
 	STR
 	ARR
 	DCT
+	ANY
 )
 
 func TestDeclareStatements(t *testing.T) {
@@ -43,6 +44,7 @@ func TestDeclareStatements(t *testing.T) {
 		{`larry x = 5`, "x", 5, false, ARR},
 		{`mdct x = 5`, "x", 5, true, DCT},
 		{`ldct x = 5`, "x", 5, false, DCT},
+		{`any x = 5`, "x", 5, false, ANY},
 	}
 
 	for _, tt := range tests {
@@ -89,6 +91,11 @@ func TestDeclareStatements(t *testing.T) {
 				return
 			}
 			val = stmt.(*ast.DctDeclare).Value
+		case ANY:
+			if !testDeclare[*ast.AnyDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
+				return
+			}
+			val = stmt.(*ast.AnyDeclare).Value
 		}
 
 		if !testLiteralExpression(t, val, tt.expectedValue) {
@@ -946,6 +953,10 @@ func TestParsingEmptyArrayLiterals(t *testing.T) {
 	checkParserErrors(t, p)
 
 	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T",
+			stmt.Expression)
+	}
 	array, ok := stmt.Expression.(*ast.ArrayLiteral)
 	if !ok {
 		t.Fatalf("exp not ast.ArrayLiteral. got=%T", stmt.Expression)
@@ -965,6 +976,10 @@ func TestParsingArrayLiterals(t *testing.T) {
 	checkParserErrors(t, p)
 
 	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T",
+			stmt.Expression)
+	}
 	array, ok := stmt.Expression.(*ast.ArrayLiteral)
 	if !ok {
 		t.Fatalf("exp not ast.ArrayLiteral. got=%T", stmt.Expression)
@@ -988,6 +1003,10 @@ func TestParsingIndexExpressions(t *testing.T) {
 	checkParserErrors(t, p)
 
 	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T",
+			stmt.Expression)
+	}
 	indexExp, ok := stmt.Expression.(*ast.IndexExpression)
 	if !ok {
 		t.Fatalf("exp not *ast.IndexExpression. got=%T", stmt.Expression)

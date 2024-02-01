@@ -49,8 +49,7 @@ larr
 larry
 mdct
 ldct
-mfun
-lfun
+any
 `
 
 	tests := []struct {
@@ -178,8 +177,7 @@ lfun
 		{token.LARR, "larry"},
 		{token.MDCT, "mdct"},
 		{token.LDCT, "ldct"},
-		{token.MFUN, "mfun"},
-		{token.LFUN, "lfun"},
+		{token.ANY, "any"},
 		{token.EOF, ""},
 	}
 

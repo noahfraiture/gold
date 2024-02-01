@@ -129,13 +129,15 @@ func (p *Parser) parseStatement() ast.Statement {
 	var declareStmt *ast.Declare
 	curTokenType := p.curToken.Type
 	switch curTokenType {
-	case token.MARR, token.MDCT, token.MINT, token.MAY, token.MFLT, token.MSTR:
+	case token.MARR, token.MDCT, token.MINT, token.MAY, token.MFLT, token.MSTR, token.ANY:
 		declareStmt = p.parseDeclareStatement(true)
 	case token.LARR, token.LDCT, token.LINT, token.LET, token.LFLT, token.LSTR:
 		declareStmt = p.parseDeclareStatement(false)
 	}
 
 	switch curTokenType {
+	case token.ANY:
+		return &ast.AnyDeclare{Declare: *declareStmt}
 	case token.MDCT, token.LDCT:
 		return &ast.DctDeclare{Declare: *declareStmt}
 	case token.MFLT, token.LFLT:

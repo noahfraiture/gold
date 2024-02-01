@@ -65,8 +65,7 @@ const (
 	LARR = "LARR"
 	MDCT = "MDCT"
 	LDCT = "LDCT"
-	MFUN = "MFUN"
-	LFUN = "LFUN"
+	ANY  = "ANY"
 )
 
 type Token struct {
@@ -98,8 +97,7 @@ var keywords = map[string]TokenType{
 	"larry":       LARR,
 	"mdct":        MDCT,
 	"ldct":        LDCT,
-	"mfun":        MFUN,
-	"lfun":        LFUN,
+	"any":         ANY,
 }
 
 func LookupIdent(ident string) TokenType {

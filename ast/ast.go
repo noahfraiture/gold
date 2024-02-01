@@ -83,6 +83,8 @@ func (ls *Declare) GetValue() Expression  { return ls.Value }
 func (ls *Declare) GetName() *Identifier  { return ls.Name }
 func (ls *Declare) GetToken() token.Token { return ls.Token }
 
+type AnyDeclare struct{ Declare }
+
 type LetDeclare struct{ Declare }
 
 type IntDeclare struct{ Declare }
