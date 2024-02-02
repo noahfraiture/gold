@@ -11,17 +11,21 @@ import (
 
 type BuiltinFunction func(args ...Object) Object
 
-type ObjectType string
-
 type Attribute struct {
-	ObjectType ObjectType
-	Nullable   bool
+	ObjectType        ObjectType
+	FunctionAttribute *Attribute
+	ArgsObjectType    []ObjectType
+	ArgsNullable      []bool
+	Nullable          bool
+	IsFunction        bool
 }
+
+type ObjectType string
 
 const (
 	NULL_OBJ  = "NULL"
 	ERROR_OBJ = "ERROR"
-	ANY = "ANY"
+	ANY       = "ANY"
 
 	INTEGER_OBJ = "INTEGER"
 	FLOAT_OBJ   = "FLOAT"

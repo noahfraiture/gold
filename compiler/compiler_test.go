@@ -730,6 +730,66 @@ func TestFunctions(t *testing.T) {
 				code.Make(code.OpPop),
 			},
 		},
+		{
+			input: `
+		    lint x = 0
+		    mint f = fn(lint a) {
+		      if (a > 2) {
+		        return a
+		      }
+		    }
+		    f(x)
+		    `,
+			expectedConstants: []interface{}{
+				0, 2, []code.Instructions{
+					code.Make(code.OpGetLocal, 0),
+					code.Make(code.OpConstant, 1),
+					code.Make(code.OpGreaterThan),
+					code.Make(code.OpJumpNotTruthy, 16),
+					code.Make(code.OpGetLocal, 0),
+					code.Make(code.OpReturn),
+					code.Make(code.OpNull),
+					code.Make(code.OpJump, 17),
+					code.Make(code.OpNull),
+					code.Make(code.OpPop),
+					code.Make(code.OpNull),
+					code.Make(code.OpReturn),
+				},
+			},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpClosure, 2, 0),
+				code.Make(code.OpSetGlobal, 1),
+				code.Make(code.OpGetGlobal, 1),
+				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpCall, 1),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input: `
+      mint f = fn(lint a) {
+        return a
+      }
+      f(1)
+      `,
+			expectedConstants: []interface{}{
+				[]code.Instructions{
+					code.Make(code.OpGetLocal, 0),
+					code.Make(code.OpReturn),
+				},
+				1,
+			},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpClosure, 0, 0),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpConstant, 1),
+				code.Make(code.OpCall, 1),
+				code.Make(code.OpPop),
+			},
+		},
 	}
 
 	runCompilerTests(t, tests)
@@ -946,7 +1006,7 @@ func TestFunctionCalls(t *testing.T) {
 		},
 		{
 			input: `
-			may oneArg = fn(a) { return a };
+			may oneArg = fn(mint a) { return a };
 			oneArg(24);
 			`,
 			expectedConstants: []interface{}{
@@ -967,7 +1027,7 @@ func TestFunctionCalls(t *testing.T) {
 		},
 		{
 			input: `
-			may manyArg = fn(a, b, c) { a; b; c };
+			may manyArg = fn(mint a, mint b, mint c) { a; b; c };
 			manyArg(24, 25, 26);
 			`,
 			expectedConstants: []interface{}{
@@ -1119,8 +1179,43 @@ func TestClosures(t *testing.T) {
 	tests := []compilerTestCase{
 		{
 			input: `
-			fn(a) {
-				return fn(b) {
+		may newClosure = fn(mint a) {
+      mint f = fn() {return a;}
+			return f
+		};
+		may closure = newClosure(99);
+		closure();
+		`,
+			expectedConstants: []interface{}{
+				[]code.Instructions{
+					code.Make(code.OpGetFree, 0),
+					code.Make(code.OpReturn),
+				},
+				[]code.Instructions{
+					code.Make(code.OpGetLocal, 0),
+					code.Make(code.OpClosure, 0, 1),
+					code.Make(code.OpSetLocal, 1),
+					code.Make(code.OpGetLocal, 1),
+					code.Make(code.OpReturn),
+				},
+				99,
+			},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpClosure, 1, 0),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpConstant, 2),
+				code.Make(code.OpCall, 1),
+				code.Make(code.OpSetGlobal, 1),
+				code.Make(code.OpGetGlobal, 1),
+				code.Make(code.OpCall, 0),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input: `
+			fn(lint a) {
+				return fn(lint b) {
 					return a + b
 				}
 			}
@@ -1145,9 +1240,9 @@ func TestClosures(t *testing.T) {
 		},
 		{
 			input: `
-			fn(a) {
-				return fn(b) {
-					return fn(c) {
+			fn(lint a) {
+				return fn(lint b) {
+					return fn(lint c) {
 						return a + b + c
 					}
 				}
@@ -1246,7 +1341,7 @@ func TestRecursiveFunctions(t *testing.T) {
 	tests := []compilerTestCase{
 		{
 			input: `
-			let countDown = fn(x) { return countDown(x - 1); };
+			let countDown = fn(lint x) { return countDown(x - 1); };
 			countDown(1);
 			`,
 			expectedConstants: []interface{}{
@@ -1273,7 +1368,7 @@ func TestRecursiveFunctions(t *testing.T) {
 		{
 			input: `
 			let wrapper = fn() {
-				let countDown = fn(x) { return countDown(x - 1); };
+				let countDown = fn(lint x) { return countDown(x - 1); };
 				return countDown(1);
 			};
 			wrapper();
@@ -1309,6 +1404,48 @@ func TestRecursiveFunctions(t *testing.T) {
 	}
 
 	runCompilerTests(t, tests)
+}
+
+func TestBuiltinFunctionsError(t *testing.T) {
+	tests := []compilerTestError{
+		{
+			input:           `len("one", "two")`,
+			expectedMessage: fmt.Errorf("wrong argument count : expect 1 but got 2"),
+		},
+		{
+			input:           `first(1)`,
+			expectedMessage: fmt.Errorf("wrong type used : '1' expect type 'ARRAY' but got 'INTEGER'"),
+		},
+		{
+			input:           `last(1)`,
+			expectedMessage: fmt.Errorf("wrong type used : '1' expect type 'ARRAY' but got 'INTEGER'"),
+		},
+		{
+			input:           `push(1)`,
+			expectedMessage: fmt.Errorf("wrong argument count : expect 2 but got 1"),
+		},
+	}
+
+	runCompilerTestsError(t, tests)
+}
+
+func TestCallingFunctionsWithWrongArguments(t *testing.T) {
+	tests := []compilerTestError{
+		{
+			input:           `fn() { return 1; }(1);`,
+			expectedMessage: fmt.Errorf("wrong argument count : expect 0 but got 1"),
+		},
+		{
+			input:           `fn(mint a) { return a; }();`,
+			expectedMessage: fmt.Errorf("wrong argument count : expect 1 but got 0"),
+		},
+		{
+			input:           `fn(mint a, mint b) { return a + b; }(1);`,
+			expectedMessage: fmt.Errorf("wrong argument count : expect 2 but got 1"),
+		},
+	}
+
+	runCompilerTestsError(t, tests)
 }
 
 func TestWrongDeclarationExpression(t *testing.T) {
@@ -1373,6 +1510,51 @@ func TestWrongDeclarationExpression(t *testing.T) {
 		{
 			input:           `x = 1`,
 			expectedMessage: fmt.Errorf("undefined variable : 'x'"),
+		},
+		{
+			input: `
+      lstr x = "test"
+      mint f = fn(lint a) {
+        if (a < 2) {
+          return a
+        }
+      }
+      f(x)
+      `,
+			expectedMessage: fmt.Errorf("wrong type used : 'x' expect type 'INTEGER' but got 'STRING'"),
+		},
+		{
+			input: `
+      lint x = 0
+      mint f = fn(mstr a) {
+        if (5 > 2) {
+          return a
+        }
+      }
+      f(x)
+      `,
+			expectedMessage: fmt.Errorf("wrong type used : 'f' expect type 'INTEGER' but got 'STRING'"),
+		},
+		{
+			input: `
+      lint x = 0
+      mint f = fn(mstr a) {
+        if (a > 2) {
+          return a
+        }
+      }
+      f(x)
+      `,
+			expectedMessage: fmt.Errorf("trying to do '>' with other than numbers or string. left=STRING right=INTEGER"),
+		},
+		{
+			input: `
+      mint f = fn(mstr a) {
+        return a
+      }
+      f(1)
+      `,
+			expectedMessage: fmt.Errorf("wrong type used : 'f' expect type 'INTEGER' but got 'STRING'"),
 		},
 	}
 

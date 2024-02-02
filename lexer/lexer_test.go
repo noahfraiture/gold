@@ -9,7 +9,7 @@ func TestNextToken(t *testing.T) {
 	input := `let five = 5;
 let ten = 10;
 
-let add = fn(x, y) {
+let add = fn(lint x, lint y) {
   x + y;
 };
 
@@ -71,8 +71,10 @@ any
 		{token.ASSIGN, "="},
 		{token.FUNCTION, "fn"},
 		{token.LPAREN, "("},
+		{token.LINT, "lint"},
 		{token.IDENT, "x"},
 		{token.COMMA, ","},
+		{token.LINT, "lint"},
 		{token.IDENT, "y"},
 		{token.RPAREN, ")"},
 		{token.LBRACE, "{"},

@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"gold/object"
+	"reflect"
 	"testing"
 )
 
@@ -18,36 +19,36 @@ func TestDefine(t *testing.T) {
 	global := NewSymbolTable()
 
 	a := global.Define("a", object.Attribute{})
-	if a != expected["a"] {
+	if !reflect.DeepEqual(a, expected["a"]) {
 		t.Errorf("expected a=%+v, got=%+v", expected["a"], a)
 	}
 
 	b := global.Define("b", object.Attribute{})
-	if b != expected["b"] {
+	if !reflect.DeepEqual(b, expected["b"]) {
 		t.Errorf("expected b=%+v, got=%+v", expected["b"], b)
 	}
 
 	firstLocal := NewEnclosedSymbolTable(global)
 
 	c := firstLocal.Define("c", object.Attribute{})
-	if c != expected["c"] {
+	if !reflect.DeepEqual(c, expected["c"]) {
 		t.Errorf("expected c=%+v, got=%+v", expected["c"], c)
 	}
 
 	d := firstLocal.Define("d", object.Attribute{})
-	if d != expected["d"] {
+	if !reflect.DeepEqual(d, expected["d"]) {
 		t.Errorf("expected d=%+v, got=%+v", expected["d"], d)
 	}
 
 	secondLocal := NewEnclosedSymbolTable(firstLocal)
 
 	e := secondLocal.Define("e", object.Attribute{})
-	if e != expected["e"] {
+	if !reflect.DeepEqual(e, expected["e"]) {
 		t.Errorf("expected e=%+v, got=%+v", expected["e"], e)
 	}
 
 	f := secondLocal.Define("f", object.Attribute{})
-	if f != expected["f"] {
+	if !reflect.DeepEqual(f, expected["f"]) {
 		t.Errorf("expected f=%+v, got=%+v", expected["f"], f)
 	}
 }
@@ -68,7 +69,7 @@ func TestResolveGlobal(t *testing.T) {
 			t.Errorf("name %s not resolvable", sym.Name)
 			continue
 		}
-		if result != sym {
+		if !reflect.DeepEqual(result, sym) {
 			t.Errorf("expected %s to resolve to %+v, got=%+v",
 				sym.Name, sym, result)
 		}
@@ -97,7 +98,7 @@ func TestResolveLocal(t *testing.T) {
 			t.Errorf("name %s not resolvable", sym.Name)
 			continue
 		}
-		if result != sym {
+		if !reflect.DeepEqual(result, sym) {
 			t.Errorf("expected %s to resolve to %+v, got=%+v",
 				sym.Name, sym, result)
 		}
@@ -148,7 +149,7 @@ func TestResolveNestedLocal(t *testing.T) {
 				t.Errorf("name %s not resolvable", sym.Name)
 				continue
 			}
-			if result != sym {
+			if !reflect.DeepEqual(result, sym) {
 				t.Errorf("expected %s to resolve to %+v, got=%+v",
 					sym.Name, sym, result)
 			}
@@ -179,7 +180,7 @@ func TestDefineResolveBuiltins(t *testing.T) {
 				t.Errorf("name %s not resolvable", sym.Name)
 				continue
 			}
-			if result != sym {
+			if !reflect.DeepEqual(result, sym) {
 				t.Errorf("expected %s to resolve to %+v, got=%+v",
 					sym.Name, sym, result)
 			}
@@ -239,7 +240,7 @@ func TestResolveFree(t *testing.T) {
 				t.Errorf("name %s not resolvable", sym.Name)
 				continue
 			}
-			if result != sym {
+			if !reflect.DeepEqual(result, sym) {
 				t.Errorf("expected %s to resolve to %+v, got=%+v",
 					sym.Name, sym, result)
 			}
@@ -253,7 +254,7 @@ func TestResolveFree(t *testing.T) {
 
 		for i, sym := range tt.expectedFreeSymbols {
 			result := tt.table.FreeSymbols[i]
-			if result != sym {
+			if !reflect.DeepEqual(result, sym) {
 				t.Errorf("wrong free symbol. got=%+v, want=%+v",
 					result, sym)
 			}
@@ -285,7 +286,7 @@ func TestResolveUnresolvableFree(t *testing.T) {
 			t.Errorf("name %s not resolvable", sym.Name)
 			continue
 		}
-		if result != sym {
+		if !reflect.DeepEqual(result, sym) {
 			t.Errorf("expected %s to resolve to %+v, got=%+v",
 				sym.Name, sym, result)
 		}
@@ -315,7 +316,7 @@ func TestDefineAndResolveFunctionName(t *testing.T) {
 		t.Fatalf("function name %s not resolvable", expected.Name)
 	}
 
-	if result != expected {
+	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("expected %s to resolve to %+v, got=%+v",
 			expected.Name, expected, result)
 	}
@@ -333,7 +334,7 @@ func TestShadowingFunctionName(t *testing.T) {
 		t.Fatalf("function name %s not resolvable", expected.Name)
 	}
 
-	if result != expected {
+	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("expected %s to resolve to %+v, got=%+v",
 			expected.Name, expected, result)
 	}

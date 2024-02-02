@@ -1,6 +1,8 @@
 package compiler
 
-import "gold/object"
+import (
+	"gold/object"
+)
 
 type SymbolScope string
 

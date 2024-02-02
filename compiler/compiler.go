@@ -5,6 +5,8 @@ import (
 	"gold/ast"
 	"gold/code"
 	"gold/object"
+	"gold/token"
+	"reflect"
 	"sort"
 )
 
@@ -69,23 +71,43 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 
 	case *ast.BlockStatement:
 		for _, s := range node.Statements {
-			tmpobjectTypeSet, err := c.Compile(s)
+			tmpObjectAttribute, err := c.Compile(s)
 			if err != nil {
 				return infos, err
 			}
 
-			if infos.ObjectType == "" {
-				infos.ObjectType = tmpobjectTypeSet.ObjectType
-				continue
-			}
+			infos.Nullable = infos.Nullable || tmpObjectAttribute.Nullable
 
-			if tmpobjectTypeSet.ObjectType == "" {
-				continue
-			}
+			// The compiled is a returned function
+			if tmpObjectAttribute.IsFunction {
 
-			if !infos.IsTypeOf(tmpobjectTypeSet.ObjectType) {
-				return infos, fmt.Errorf("block statement can return different types. old=%s current=%s",
-					infos.ObjectType, tmpobjectTypeSet.ObjectType)
+				// infos has nothing yet
+				if infos.ObjectType == "" {
+					infos.ObjectType = tmpObjectAttribute.ObjectType
+					infos.FunctionAttribute = &tmpObjectAttribute
+					continue
+				}
+
+				// We already had a returned value which is not a function
+				if infos.FunctionAttribute == nil {
+					return infos, fmt.Errorf("return function and not function") // TODO : better error message
+				}
+
+				// We already had a returned function but with different attributes
+				if !reflect.DeepEqual(infos.FunctionAttribute, tmpObjectAttribute.FunctionAttribute) {
+					return infos, fmt.Errorf("return function with different attributes")
+				}
+			} else {
+
+				if infos.ObjectType == "" {
+					infos.ObjectType = tmpObjectAttribute.ObjectType
+					continue
+				}
+
+				if !infos.IsTypeOf(tmpObjectAttribute.ObjectType) {
+					return infos, fmt.Errorf("block statement can return different types. old=%s current=%s",
+						infos.ObjectType, tmpObjectAttribute.ObjectType)
+				}
 			}
 		}
 
@@ -450,55 +472,43 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 
 	// === DECLARE ===
 	case *ast.LetDeclare:
-		infos, err = c.Compile(node.Value)
+		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, "")
 		if err != nil {
 			return infos, err
 		}
 
-		if infos.Nullable && !node.Nullable {
-			return infos, errorNullable(node.Name.Value)
-		}
-
-		symbol := c.symbolTable.Define(node.Name.Value, object.Attribute{Nullable: node.Nullable, ObjectType: infos.ObjectType})
-
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpSetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpSetLocal, symbol.Index)
-		}
-
 	case *ast.AnyDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.ANY) // Will be nullable
+		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, object.ANY) // Will be nullable
 		if err != nil {
 			return infos, err
 		}
 
 	case *ast.IntDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.INTEGER_OBJ)
+		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, object.INTEGER_OBJ)
 		if err != nil {
 			return infos, err
 		}
 
-	case *ast.FloatDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.FLOAT_OBJ)
+	case *ast.FltDeclare:
+		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, object.FLOAT_OBJ)
 		if err != nil {
 			return infos, err
 		}
 
 	case *ast.StrDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.STRING_OBJ)
+		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, object.STRING_OBJ)
 		if err != nil {
 			return infos, err
 		}
 
 	case *ast.ArrDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.ARRAY_OBJ)
+		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, object.ARRAY_OBJ)
 		if err != nil {
 			return infos, err
 		}
 
 	case *ast.DctDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.HASH_OBJ)
+		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, object.HASH_OBJ)
 		if err != nil {
 			return infos, err
 		}
@@ -532,7 +542,7 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 	case *ast.Identifier:
 		symbol, ok := c.symbolTable.Resolve(node.Value)
 		if !ok {
-			return infos, fmt.Errorf("undefined variable %s", node.Value)
+			return infos, errorUndefined(node.Value)
 		}
 
 		c.loadSymbol(symbol)
@@ -541,21 +551,43 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 	case *ast.FunctionLiteral:
 		c.enterScope()
 
+		argsObjectType := make([]object.ObjectType, 0, len(node.Parameters))
+		argsNullable := make([]bool, 0, len(node.Parameters))
+		for _, p := range node.Parameters {
+
+			nullable := isNullable(p.Token.Type)
+			objectType := objectType(p.Token.Type)
+			if objectType == "" {
+				return infos, fmt.Errorf("unsupported type for parameter : '%s'", p.Token.Type)
+			}
+
+			argsObjectType = append(argsObjectType, objectType)
+			argsNullable = append(argsNullable, nullable)
+			c.symbolTable.Define(p.Name.Value, object.Attribute{ObjectType: objectType, Nullable: nullable})
+		}
+
 		if node.Name != "" {
 			// ANY since the function itself has no type but the variabe associated has.
 			// But if we decide to modify the definition to include a type, it can be add there.
-			c.symbolTable.DefineFunctionName(node.Name, object.Attribute{ObjectType: object.ANY, Nullable: false})
-		}
-
-		// TODO : function accept arguments of any type and function
-		for _, p := range node.Parameters {
-			c.symbolTable.Define(p.Value, object.Attribute{ObjectType: object.ANY, Nullable: true})
+			c.symbolTable.DefineFunctionName(
+				node.Name,
+				object.Attribute{
+					ObjectType:     object.ANY,
+					Nullable:       false,
+					ArgsObjectType: argsObjectType,
+					ArgsNullable:   argsNullable,
+					IsFunction:     true,
+				})
 		}
 
 		infos, err = c.Compile(node.Body)
 		if err != nil {
 			return infos, err
 		}
+
+		infos.ArgsNullable = argsNullable
+		infos.ArgsObjectType = argsObjectType
+		infos.IsFunction = true
 
 		if !c.lastInstructionIs(code.OpReturn) {
 			c.emit(code.OpNull)
@@ -570,6 +602,9 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 			c.loadSymbol(s)
 		}
 
+		// Can't be in info (returned value no used)
+		// Can't be in constant (only explored in vm)
+		// Should be in Define and thus in node. But how to transfer value ?
 		compiledFn := &object.CompiledFunction{
 			Instructions:  instructions,
 			NumLocals:     numLocals,
@@ -588,17 +623,41 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		c.emit(code.OpReturn)
 
 	case *ast.CallExpression:
-		infos, err = c.Compile(node.Function)
+		// FIX : return the infos about the called function but should give infos about returned value
+		// of the function concerning the arguments
+		// I could change the behavior for Identifier but it should work for Identifier and FunctionLiteral
+		// Should modify the object.Attribute to accept information about the returned value separated from the function itself
+		//
+		// How to declare function that return function ? What should be the type ?
+		// It should be recursively the return type of embedded function
+		//
+		// If the returned value is a function, ObjectType=="" and instead store an Attribute
+		infos, err = c.Compile(node.Function) // Identifier or FunctionLiteral
 		if err != nil {
 			return infos, err
 		}
 
-		for _, a := range node.Arguments {
-			// TODO : we ignore the type since arguments have to particular type
-			_, err := c.Compile(a)
+		if len(node.Arguments) != len(infos.ArgsObjectType) {
+			return infos, errorArgumentCount(len(infos.ArgsObjectType), len(node.Arguments))
+		}
+
+		for i, a := range node.Arguments {
+			argInfo, err := c.Compile(a)
 			if err != nil {
 				return infos, err
 			}
+
+			if argInfo.Nullable && !infos.ArgsNullable[i] {
+				return infos, errorNullable(a.String())
+			}
+
+			if !argInfo.IsTypeOf(infos.ArgsObjectType[i]) {
+				return infos, errorType(a.String(), infos.ArgsObjectType[i], argInfo.ObjectType)
+			}
+		}
+
+		if infos.FunctionAttribute != nil {
+			infos = *infos.FunctionAttribute
 		}
 
 		c.emit(code.OpCall, len(node.Arguments))
@@ -722,23 +781,34 @@ func (c *Compiler) loadSymbol(s Symbol) {
 }
 
 func (c *Compiler) compileDeclare(
-	nodeName string, nullable bool, nodeValue ast.Node, objectType object.ObjectType,
+	nodeName string, nodeValue ast.Node, nullable bool, objectType object.ObjectType,
 ) error {
+	// NOTE : return the infos about the called function instead of the returned value (can be a function)
 	infos, err := c.Compile(nodeValue)
 	if err != nil {
 		return err
 	}
 
-	if infos.Nullable && !nullable {
+	// In case of 'let' or 'may', we except the type to be inferred by the compiler
+	if objectType == "" {
+		objectType = infos.ObjectType
+	}
+	attributes := object.Attribute{
+		ObjectType:        objectType,
+		Nullable:          nullable,
+		IsFunction:        infos.IsFunction,
+		FunctionAttribute: infos.FunctionAttribute,
+		ArgsObjectType:    infos.ArgsObjectType,
+		ArgsNullable:      infos.ArgsNullable,
+	}
+
+	if infos.Nullable && !attributes.Nullable {
 		return errorNullable(nodeName)
 	}
 
-	symbol := c.symbolTable.Define(
-		nodeName,
-		object.Attribute{ObjectType: objectType, Nullable: nullable},
-	)
+	symbol := c.symbolTable.Define(nodeName, attributes)
 
-	if objectType != object.ANY && infos.ObjectType != symbol.ObjectInfo.ObjectType {
+	if attributes.ObjectType != object.ANY && infos.ObjectType != symbol.ObjectInfo.ObjectType {
 		return errorType(nodeName, symbol.ObjectInfo.ObjectType, infos.ObjectType)
 	}
 	if symbol.Scope == GlobalScope {
@@ -747,6 +817,35 @@ func (c *Compiler) compileDeclare(
 		c.emit(code.OpSetLocal, symbol.Index)
 	}
 	return nil
+}
+
+func isNullable(tk token.TokenType) bool {
+	switch tk {
+	case token.MAY, token.MINT, token.MFLT, token.MSTR, token.MARR, token.MDCT, token.ANY:
+		return true
+	case token.LET, token.LINT, token.LFLT, token.LSTR, token.LARR, token.LDCT:
+		return false
+	}
+	return false
+}
+
+func objectType(tk token.TokenType) object.ObjectType {
+	switch tk {
+	case token.ANY:
+		return object.ANY
+	case token.MINT, token.LINT:
+		return object.INTEGER_OBJ
+	case token.MFLT, token.LFLT:
+		return object.FLOAT_OBJ
+	case token.MSTR, token.LSTR:
+		return object.STRING_OBJ
+	case token.MARR, token.LARR:
+		return object.ARRAY_OBJ
+	case token.MDCT, token.LDCT:
+		return object.HASH_OBJ
+	default:
+		return ""
+	}
 }
 
 func errorUndefined(name string) error {
@@ -761,8 +860,8 @@ func errorType(name string, expected, got object.ObjectType) error {
 	return fmt.Errorf("wrong type used : '%s' expect type '%s' but got '%s'", name, expected, got)
 }
 
-func errorCondition(objectType object.ObjectType) error {
-	return fmt.Errorf("trying to use '%v' as condition", objectType)
+func errorArgumentCount(expected, got int) error {
+	return fmt.Errorf("wrong argument count : expect %d but got %d", expected, got)
 }
 
 type Bytecode struct {

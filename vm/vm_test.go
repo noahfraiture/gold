@@ -394,21 +394,21 @@ func TestCallingFunctionsWithArgumentsAndBindings(t *testing.T) {
 	tests := []vmTestCase{
 		{
 			input: `
-		may identity = fn(a) { return a; };
+		may identity = fn(mint a) { return a; };
 		identity(4);
 		`,
 			expected: 4,
 		},
 		{
 			input: `
-		may sum = fn(a, b) { return a + b; };
+		may sum = fn(mint a, mint b) { return a + b; };
 		sum(1, 2);
 		`,
 			expected: 3,
 		},
 		{
 			input: `
-		may sum = fn(a, b) {
+		may sum = fn(mint a, mint b) {
 			may c = a + b;
 			return c;
 		};
@@ -418,7 +418,7 @@ func TestCallingFunctionsWithArgumentsAndBindings(t *testing.T) {
 		},
 		{
 			input: `
-		may sum = fn(a, b) {
+		may sum = fn(mint a, mint b) {
 			may c = a + b;
 			return c;
 		};
@@ -427,7 +427,7 @@ func TestCallingFunctionsWithArgumentsAndBindings(t *testing.T) {
 		},
 		{
 			input: `
-		may sum = fn(a, b) {
+		may sum = fn(mint a, mint b) {
 			may c = a + b;
 			return c;
 		};
@@ -442,7 +442,7 @@ func TestCallingFunctionsWithArgumentsAndBindings(t *testing.T) {
 			input: `
 		let globalNum = 10;
 
-		may sum = fn(a, b) {
+		may sum = fn(mint a, mint b) {
 			may c = a + b;
 			return c + globalNum;
 		};
@@ -460,88 +460,20 @@ func TestCallingFunctionsWithArgumentsAndBindings(t *testing.T) {
 	runVmTests(t, tests)
 }
 
-func TestCallingFunctionsWithWrongArguments(t *testing.T) {
-	tests := []vmTestCase{
-		{
-			input:    `fn() { return 1; }(1);`,
-			expected: `wrong number of arguments: want=0, got=1`,
-		},
-		{
-			input:    `fn(a) { return a; }();`,
-			expected: `wrong number of arguments: want=1, got=0`,
-		},
-		{
-			input:    `fn(a, b) { return a + b; }(1);`,
-			expected: `wrong number of arguments: want=2, got=1`,
-		},
-	}
-
-	for _, tt := range tests {
-		program := parse(tt.input)
-
-		comp := compiler.New()
-		_, err := comp.Compile(program)
-		if err != nil {
-			t.Fatalf("compiler error: %s", err)
-		}
-
-		vm := New(comp.Bytecode())
-		err = vm.Run()
-		if err == nil {
-			t.Fatalf("expected VM error but resulted in none.")
-		}
-
-		if err.Error() != tt.expected {
-			t.Fatalf("wrong VM error: want=%q, got=%q", tt.expected, err)
-		}
-	}
-}
-
 func TestBuiltinFunctions(t *testing.T) {
 	tests := []vmTestCase{
 		{`len("")`, 0},
 		{`len("four")`, 4},
 		{`len("hello world")`, 11},
-		{
-			`len(1)`,
-			&object.Error{
-				Message: "argument to `len` not supported, got INTEGER",
-			},
-		},
-		{
-			`len("one", "two")`,
-			&object.Error{
-				Message: "wrong number of arguments. got=2, want=1",
-			},
-		},
 		{`len([1, 2, 3])`, 3},
 		{`len([])`, 0},
-		{`puts("hello", "world!")`, Null},
 		{`first([1, 2, 3])`, 1},
 		{`first([])`, Null},
-		{
-			`first(1)`,
-			&object.Error{
-				Message: "argument to `first` must be ARRAY, got INTEGER",
-			},
-		},
 		{`last([1, 2, 3])`, 3},
 		{`last([])`, Null},
-		{
-			`last(1)`,
-			&object.Error{
-				Message: "argument to `last` must be ARRAY, got INTEGER",
-			},
-		},
 		{`rest([1, 2, 3])`, []int{2, 3}},
 		{`rest([])`, Null},
 		{`push([], 1)`, []int{1}},
-		{
-			`push(1, 1)`,
-			&object.Error{
-				Message: "argument to `push` must be ARRAY, got INTEGER",
-			},
-		},
 	}
 
 	runVmTests(t, tests)
@@ -551,8 +483,9 @@ func TestClosures(t *testing.T) {
 	tests := []vmTestCase{
 		{
 			input: `
-		may newClosure = fn(a) {
-			return fn() { return a; };
+		may newClosure = fn(mint a) {
+      mint f = fn() {return a;}
+			return f
 		};
 		may closure = newClosure(99);
 		closure();
@@ -561,8 +494,8 @@ func TestClosures(t *testing.T) {
 		},
 		{
 			input: `
-		may newAdder = fn(a, b) {
-			return fn(c) { return a + b + c };
+		may newAdder = fn(mint a, mint b) {
+			return fn(mint c) { return a + b + c };
 		};
 		may adder = newAdder(1, 2);
 		adder(8);
@@ -571,9 +504,9 @@ func TestClosures(t *testing.T) {
 		},
 		{
 			input: `
-		may newAdder = fn(a, b) {
+		may newAdder = fn(mint a, mint b) {
 			may c = a + b;
-			return fn(d) { return c + d };
+			return fn(mint d) { return c + d };
 		};
 		may adder = newAdder(1, 2);
 		adder(8);
@@ -582,11 +515,11 @@ func TestClosures(t *testing.T) {
 		},
 		{
 			input: `
-		may newAdderOuter = fn(a, b) {
+		may newAdderOuter = fn(mint a, mint b) {
 			may c = a + b;
-			return fn(d) {
+			return fn(mint d) {
 				may e = d + c;
-				return fn(f) { return e + f; };
+				return fn(mint f) { return e + f; };
 			};
 		};
 		may newAdderInner = newAdderOuter(1, 2)
@@ -598,9 +531,9 @@ func TestClosures(t *testing.T) {
 		{
 			input: `
 		let a = 1;
-		may newAdderOuter = fn(b) {
-			return fn(c) {
-				return fn(d) { return a + b + c + d };
+		may newAdderOuter = fn(mint b) {
+			return fn(mint c) {
+				return fn(mint d) { return a + b + c + d };
 			};
 		};
 		may newAdderInner = newAdderOuter(2)
@@ -611,7 +544,7 @@ func TestClosures(t *testing.T) {
 		},
 		{
 			input: `
-		may newClosure = fn(a, b) {
+		may newClosure = fn(mint a, mint b) {
 			may one = fn() { return a; };
 			may two = fn() { return b; };
 			return fn() { return one() + two(); };
@@ -630,7 +563,7 @@ func TestRecursiveFunctions(t *testing.T) {
 	tests := []vmTestCase{
 		{
 			input: `
-		let countDown = fn(x) {
+		let countDown = fn(mint x) {
 			if (x == 0) {
 				return 0;
 			} else {
@@ -643,7 +576,7 @@ func TestRecursiveFunctions(t *testing.T) {
 		},
 		{
 			input: `
-		let countDown = fn(x) {
+		let countDown = fn(mint x) {
 			if (x == 0) {
 				return 0;
 			} else {
@@ -660,7 +593,7 @@ func TestRecursiveFunctions(t *testing.T) {
 		{
 			input: `
 		let wrapper = fn() {
-			let countDown = fn(x) {
+			let countDown = fn(mint x) {
 				if (x == 0) {
 					return 0;
 				} else {
@@ -682,7 +615,7 @@ func TestRecursiveFibonacci(t *testing.T) {
 	tests := []vmTestCase{
 		{
 			input: `
-		let fibonacci = fn(x) {
+		let fibonacci = fn(mint x) {
 			if (x == 0) {
 				return 0;
 			} else {

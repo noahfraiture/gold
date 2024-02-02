@@ -27,7 +27,7 @@ var Builtins = []struct {
 				}
 			},
 		},
-		Attribute{ObjectType: INTEGER_OBJ, Nullable: false},
+		Attribute{ObjectType: INTEGER_OBJ, Nullable: false, ArgsNullable: []bool{false}, ArgsObjectType: []ObjectType{ANY}},
 	},
 	{
 		"puts",
@@ -40,7 +40,7 @@ var Builtins = []struct {
 				return nil
 			},
 		},
-		Attribute{ObjectType: NULL_OBJ, Nullable: true},
+		Attribute{ObjectType: NULL_OBJ, Nullable: true, ArgsNullable: []bool{true}, ArgsObjectType: []ObjectType{ANY}},
 	},
 	{
 		"first",
@@ -63,7 +63,7 @@ var Builtins = []struct {
 				return nil
 			},
 		},
-		Attribute{ObjectType: ANY, Nullable: true},
+		Attribute{ObjectType: ANY, Nullable: true, ArgsNullable: []bool{false}, ArgsObjectType: []ObjectType{ARRAY_OBJ}},
 	},
 	{
 		"last",
@@ -87,7 +87,7 @@ var Builtins = []struct {
 				return nil
 			},
 		},
-		Attribute{ObjectType: ANY, Nullable: true},
+		Attribute{ObjectType: ANY, Nullable: true, ArgsNullable: []bool{false}, ArgsObjectType: []ObjectType{ARRAY_OBJ}},
 	},
 	{
 		"rest",
@@ -105,7 +105,7 @@ var Builtins = []struct {
 				arr := args[0].(*Array)
 				length := len(arr.Elements)
 				if length > 0 {
-					newElements := make([]Object, length-1, length-1)
+					newElements := make([]Object, length-1)
 					copy(newElements, arr.Elements[1:length])
 					return &Array{Elements: newElements}
 				}
@@ -113,7 +113,7 @@ var Builtins = []struct {
 				return nil
 			},
 		},
-		Attribute{ObjectType: ARRAY_OBJ, Nullable: true},
+		Attribute{ObjectType: ARRAY_OBJ, Nullable: true, ArgsNullable: []bool{false}, ArgsObjectType: []ObjectType{ARRAY_OBJ}},
 	},
 	{
 		"push",
@@ -131,14 +131,14 @@ var Builtins = []struct {
 				arr := args[0].(*Array)
 				length := len(arr.Elements)
 
-				newElements := make([]Object, length+1, length+1)
+				newElements := make([]Object, length+1)
 				copy(newElements, arr.Elements)
 				newElements[length] = args[1]
 
 				return &Array{Elements: newElements}
 			},
 		},
-		Attribute{ObjectType: ARRAY_OBJ, Nullable: false},
+		Attribute{ObjectType: ARRAY_OBJ, Nullable: false, ArgsNullable: []bool{false, false}, ArgsObjectType: []ObjectType{ARRAY_OBJ, ANY}},
 	},
 }
 

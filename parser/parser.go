@@ -128,11 +128,9 @@ func (p *Parser) parseStatement() ast.Statement {
 
 	var declareStmt *ast.Declare
 	curTokenType := p.curToken.Type
-	switch curTokenType {
-	case token.MARR, token.MDCT, token.MINT, token.MAY, token.MFLT, token.MSTR, token.ANY:
-		declareStmt = p.parseDeclareStatement(true)
-	case token.LARR, token.LDCT, token.LINT, token.LET, token.LFLT, token.LSTR:
-		declareStmt = p.parseDeclareStatement(false)
+	nullable, err := isNullable(curTokenType)
+	if err == nil {
+		declareStmt = p.parseDeclareStatement(nullable)
 	}
 
 	switch curTokenType {
@@ -141,7 +139,7 @@ func (p *Parser) parseStatement() ast.Statement {
 	case token.MDCT, token.LDCT:
 		return &ast.DctDeclare{Declare: *declareStmt}
 	case token.MFLT, token.LFLT:
-		return &ast.FloatDeclare{Declare: *declareStmt}
+		return &ast.FltDeclare{Declare: *declareStmt}
 	case token.MARR, token.LARR:
 		return &ast.ArrDeclare{Declare: *declareStmt}
 	case token.MSTR, token.LSTR:
@@ -154,6 +152,17 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseReturnStatement()
 	default:
 		return p.parseExpressionStatement()
+	}
+}
+
+func isNullable(tk token.TokenType) (bool, error) {
+	switch tk {
+	case token.MARR, token.MDCT, token.MINT, token.MAY, token.MFLT, token.MSTR, token.ANY:
+		return true, nil
+	case token.LARR, token.LDCT, token.LINT, token.LET, token.LFLT, token.LSTR:
+		return false, nil
+	default:
+		return false, fmt.Errorf("not a known declare token type: %s", tk)
 	}
 }
 
@@ -499,31 +508,40 @@ func (p *Parser) parseFunctionLiteral() ast.Expression {
 	return lit
 }
 
-func (p *Parser) parseFunctionParameters() []*ast.Identifier {
-	identifiers := []*ast.Identifier{}
+func (p *Parser) parseFunctionParameters() []*ast.Parameter {
+	parameters := []*ast.Parameter{}
 
 	if p.peekTokenIs(token.RPAREN) {
 		p.nextToken()
-		return identifiers
+		return parameters
 	}
 
 	p.nextToken()
 
-	ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-	identifiers = append(identifiers, ident)
+	// NOTE : should I take care of nullable here or in compiler ? For now it's gonna be here
+
+	nullable, _ := isNullable(p.curToken.Type)
+
+	para := &ast.Parameter{Token: p.curToken, Nullable: nullable}
+	p.nextToken()
+	para.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	parameters = append(parameters, para)
 
 	for p.peekTokenIs(token.COMMA) {
 		p.nextToken()
 		p.nextToken()
-		ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-		identifiers = append(identifiers, ident)
+		nullable, _ := isNullable(p.curToken.Type)
+		para := &ast.Parameter{Token: p.curToken, Nullable: nullable}
+		p.nextToken()
+		para.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		parameters = append(parameters, para)
 	}
 
 	if !p.expectPeek(token.RPAREN) {
 		return nil
 	}
 
-	return identifiers
+	return parameters
 }
 
 func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {

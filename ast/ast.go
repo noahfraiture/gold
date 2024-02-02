@@ -83,19 +83,15 @@ func (ls *Declare) GetValue() Expression  { return ls.Value }
 func (ls *Declare) GetName() *Identifier  { return ls.Name }
 func (ls *Declare) GetToken() token.Token { return ls.Token }
 
-type AnyDeclare struct{ Declare }
-
-type LetDeclare struct{ Declare }
-
-type IntDeclare struct{ Declare }
-
-type FloatDeclare struct{ Declare }
-
-type StrDeclare struct{ Declare }
-
-type ArrDeclare struct{ Declare }
-
-type DctDeclare struct{ Declare }
+type (
+	AnyDeclare struct{ Declare }
+	LetDeclare struct{ Declare }
+	IntDeclare struct{ Declare }
+	FltDeclare struct{ Declare }
+	StrDeclare struct{ Declare }
+	ArrDeclare struct{ Declare }
+	DctDeclare struct{ Declare }
+)
 
 type ReassignStatement struct {
 	Value Expression
@@ -175,7 +171,7 @@ func (bs *BlockStatement) String() string {
 // Expressions
 type Identifier struct {
 	Token token.Token // the token.IDENT token
-	Value string
+	Value string      // the token literal
 }
 
 func (i *Identifier) expressionNode()      {}
@@ -340,7 +336,7 @@ type FunctionLiteral struct {
 	Body       *BlockStatement
 	Name       string
 	Token      token.Token // The 'fn' token
-	Parameters []*Identifier
+	Parameters []*Parameter
 }
 
 func (fl *FunctionLiteral) expressionNode()      {}
@@ -361,6 +357,23 @@ func (fl *FunctionLiteral) String() string {
 	out.WriteString(strings.Join(params, ", "))
 	out.WriteString(") ")
 	out.WriteString(fl.Body.String())
+
+	return out.String()
+}
+
+type Parameter struct {
+	Name     *Identifier
+	Token    token.Token // the token.LINT token
+	Nullable bool
+}
+
+func (pa *Parameter) expressionNode()      {}
+func (pa *Parameter) TokenLiteral() string { return pa.Token.Literal }
+func (pa *Parameter) String() string {
+	var out bytes.Buffer
+
+	out.WriteString(pa.TokenLiteral() + " ")
+	out.WriteString(pa.Name.String())
 
 	return out.String()
 }
