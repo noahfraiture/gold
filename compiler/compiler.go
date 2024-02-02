@@ -738,7 +738,7 @@ func (c *Compiler) compileDeclare(
 		object.Attribute{ObjectType: objectType, Nullable: nullable},
 	)
 
-	if infos.ObjectType != symbol.ObjectInfo.ObjectType {
+	if objectType != object.UNDEFINED && infos.ObjectType != symbol.ObjectInfo.ObjectType {
 		return errorType(nodeName, symbol.ObjectInfo.ObjectType, infos.ObjectType)
 	}
 	if symbol.Scope == GlobalScope {
