@@ -21,7 +21,7 @@ type Attribute struct {
 const (
 	NULL_OBJ  = "NULL"
 	ERROR_OBJ = "ERROR"
-	UNDEFINED = "UNDEFINED"
+	ANY = "ANY"
 
 	INTEGER_OBJ = "INTEGER"
 	FLOAT_OBJ   = "FLOAT"
@@ -43,11 +43,11 @@ const (
 
 func (info *Attribute) IsTypeOf(s ...ObjectType) bool {
 	for _, c := range s {
-		if info.ObjectType == c || c == UNDEFINED {
+		if info.ObjectType == c || c == ANY {
 			return true
 		}
 	}
-	return info.ObjectType == UNDEFINED
+	return info.ObjectType == ANY
 }
 
 type HashKey struct {

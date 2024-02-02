@@ -63,7 +63,7 @@ var Builtins = []struct {
 				return nil
 			},
 		},
-		Attribute{ObjectType: UNDEFINED, Nullable: true},
+		Attribute{ObjectType: ANY, Nullable: true},
 	},
 	{
 		"last",
@@ -87,7 +87,7 @@ var Builtins = []struct {
 				return nil
 			},
 		},
-		Attribute{ObjectType: UNDEFINED, Nullable: true},
+		Attribute{ObjectType: ANY, Nullable: true},
 	},
 	{
 		"rest",

@@ -380,7 +380,7 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		}
 
 		c.emit(code.OpIndex)
-		infos.ObjectType = object.UNDEFINED
+		infos.ObjectType = object.ANY
 
 	// === VALUE ===
 	case *ast.IntegerLiteral:
@@ -468,7 +468,7 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		}
 
 	case *ast.AnyDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.UNDEFINED) // Will be nullable
+		err := c.compileDeclare(node.Name.Value, node.Nullable, node.Value, object.ANY) // Will be nullable
 		if err != nil {
 			return infos, err
 		}
@@ -542,14 +542,14 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		c.enterScope()
 
 		if node.Name != "" {
-			// UNDEFINED since the function itself has no type but the variabe associated has.
+			// ANY since the function itself has no type but the variabe associated has.
 			// But if we decide to modify the definition to include a type, it can be add there.
-			c.symbolTable.DefineFunctionName(node.Name, object.Attribute{ObjectType: object.UNDEFINED, Nullable: false})
+			c.symbolTable.DefineFunctionName(node.Name, object.Attribute{ObjectType: object.ANY, Nullable: false})
 		}
 
 		// TODO : function accept arguments of any type and function
 		for _, p := range node.Parameters {
-			c.symbolTable.Define(p.Value, object.Attribute{ObjectType: object.UNDEFINED, Nullable: true})
+			c.symbolTable.Define(p.Value, object.Attribute{ObjectType: object.ANY, Nullable: true})
 		}
 
 		infos, err = c.Compile(node.Body)
@@ -738,7 +738,7 @@ func (c *Compiler) compileDeclare(
 		object.Attribute{ObjectType: objectType, Nullable: nullable},
 	)
 
-	if objectType != object.UNDEFINED && infos.ObjectType != symbol.ObjectInfo.ObjectType {
+	if objectType != object.ANY && infos.ObjectType != symbol.ObjectInfo.ObjectType {
 		return errorType(nodeName, symbol.ObjectInfo.ObjectType, infos.ObjectType)
 	}
 	if symbol.Scope == GlobalScope {
