@@ -18,7 +18,7 @@ type Symbol struct {
 	Name  string
 	Scope SymbolScope
 
-	// NOTE : number of symbol in the table. Index when the VM will
+	// number of symbol in the table. Index when the VM will
 	// add the symbol in its list of symbol in the correct scope.
 	Index      int
 	ObjectInfo object.Attribute

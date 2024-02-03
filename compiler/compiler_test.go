@@ -161,7 +161,7 @@ func TestVariablesInc(t *testing.T) {
 				code.Make(code.OpSetGlobal, 0),
 				code.Make(code.OpGetGlobal, 0),
 				code.Make(code.OpGetGlobal, 0),
-				code.Make(code.OpInc), // NOTE : could use add opcode but more costly
+				code.Make(code.OpInc),
 				code.Make(code.OpSetGlobal, 0),
 				code.Make(code.OpPop),
 			},
@@ -453,7 +453,7 @@ func TestLoops(t *testing.T) {
 				code.Make(code.OpPop),               // 0007
 				code.Make(code.OpJump, 0),           // 0008
 				code.Make(code.OpNull),              // 0011
-				code.Make(code.OpPop),               // NOTE : while is an expression and so must produce a value// 0012
+				code.Make(code.OpPop),               // 0012
 				code.Make(code.OpConstant, 1),       // 0013
 				code.Make(code.OpPop),               // 0017
 			},
@@ -633,7 +633,7 @@ func TestGlobalReassign(t *testing.T) {
 			},
 		},
 		{
-			// NOTE : even when use same constant, get different OpConstant code, could need opti
+			// PERF : even when use same constant, get different OpConstant code, could need opti
 			input: `
       let one = 1;
       let two = 2;
@@ -1165,7 +1165,7 @@ func TestBuiltins(t *testing.T) {
 				code.Make(code.OpArray, 0),
 				code.Make(code.OpCall, 1),
 				code.Make(code.OpPop),
-				code.Make(code.OpGetBuiltin, 5),
+				code.Make(code.OpGetBuiltin, 4),
 				code.Make(code.OpArray, 0),
 				code.Make(code.OpConstant, 0),
 				code.Make(code.OpCall, 2),

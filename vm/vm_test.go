@@ -470,8 +470,6 @@ func TestBuiltinFunctions(t *testing.T) {
 		{`first([])`, Null},
 		{`last([1, 2, 3])`, 3},
 		{`last([])`, Null},
-		{`rest([1, 2, 3])`, []int{2, 3}},
-		{`rest([])`, Null},
 		{`push([], 1)`, []int{1}},
 	}
 

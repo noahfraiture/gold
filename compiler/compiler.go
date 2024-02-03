@@ -179,7 +179,8 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 
 		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
 
-		_, err = c.Compile(node.Consequence) // NOTE : will have to get the infos when while return value. How to ignore return and only take break return value?
+		// NOTE : will have to get the infos when while return value. How to ignore return and only take break return value?
+		_, err = c.Compile(node.Consequence)
 		if err != nil {
 			return infos, err
 		}
@@ -189,7 +190,7 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		afterConsequencePos := len(c.currentInstructions())
 		c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
 
-		c.emit(code.OpNull) // NOTE : since it's an expression, must produce a value
+		c.emit(code.OpNull) // since it's an expression, must produce a value
 		infos.Nullable = true
 
 	case *ast.InfixExpression:
@@ -285,10 +286,7 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 			return infos, fmt.Errorf("unknown operator '%s'", node.Operator)
 		}
 
-		// NOTE : is a new structure, is it needed ? could reuse prefix and create postfilx
-
 	case *ast.IncPostExpression:
-		// Compile twice to have two OpGet to still have one after modification
 		symbol, ok := c.symbolTable.Resolve(node.Left.Value)
 		if !ok {
 			return infos, nil
@@ -299,6 +297,7 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		}
 		infos = symbol.ObjectInfo
 
+		// Compile twice to have two OpGet to still have one after modification
 		if symbol.Scope == GlobalScope {
 			c.emit(code.OpGetGlobal, symbol.Index)
 			c.emit(code.OpGetGlobal, symbol.Index)
@@ -307,6 +306,7 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 			c.emit(code.OpGetLocal, symbol.Index)
 		}
 
+		// PERF : could use add opcode but more costly
 		switch node.Operator {
 		case "++":
 			c.emit(code.OpInc)
@@ -323,10 +323,8 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		}
 
 	case *ast.IncPreExpression:
-		// NOTE : could need less code and let OpInc do everything to limit the bytecode
-		// The problem is to choose global or local
+		// TODO : refactor to simplify in prefix and postfix operation
 
-		// Compile twice to have two OpGet to still have one after modification
 		symbol, ok := c.symbolTable.Resolve(node.Right.Value)
 		if !ok {
 			return infos, fmt.Errorf("unknown name %s", node.Right.Value)
@@ -354,13 +352,9 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 
 		if symbol.Scope == GlobalScope {
 			c.emit(code.OpSetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpSetLocal, symbol.Index)
-		}
-
-		if symbol.Scope == GlobalScope {
 			c.emit(code.OpGetGlobal, symbol.Index)
 		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
 			c.emit(code.OpGetLocal, symbol.Index)
 		}
 
@@ -372,7 +366,7 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 
 		switch node.Operator {
 		case "!":
-			// NOTE : every value can be truthy, so we don't check type
+			// Every value can be truthy, so we don't check type
 			c.emit(code.OpBang)
 		case "-":
 			if !infos.IsTypeOf(object.INTEGER_OBJ, object.FLOAT_OBJ) {
@@ -384,7 +378,6 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		}
 
 	case *ast.IndexExpression:
-		// NOTE : since array and map accept anything, it's impossible to define a  type
 		implemInfos, err := c.Compile(node.Left)
 		if err != nil {
 			return infos, err
@@ -405,6 +398,7 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		infos.ObjectType = object.ANY
 
 	// === VALUE ===
+
 	case *ast.IntegerLiteral:
 		integer := &object.Integer{Value: node.Value}
 		c.emit(code.OpConstant, c.addConstant(integer))
@@ -467,15 +461,10 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		c.emit(code.OpHash, len(node.Pairs)*2)
 		infos.ObjectType = object.HASH_OBJ
 
-		// === DECLARE ===
-	case *ast.Declare:
-		obType := objectType(node.Token.Type)
-		if node.Token.Type == "let" || node.Token.Type == "may" {
-			obType = ""
-		}
+	// === DECLARE ===
 
-		fmt.PrintobType)
-		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, obType)
+	case *ast.Declare:
+		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, objectType(node.Token.Type))
 		if err != nil {
 			return infos, err
 		}
@@ -740,7 +729,6 @@ func (c *Compiler) loadSymbol(s Symbol) {
 func (c *Compiler) compileDeclare(
 	nodeName string, nodeValue ast.Node, nullable bool, objectType object.ObjectType,
 ) error {
-	// NOTE : return the infos about the called function instead of the returned value (can be a function)
 	infos, err := c.Compile(nodeValue)
 	if err != nil {
 		return err

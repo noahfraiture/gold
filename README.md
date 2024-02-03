@@ -1,28 +1,98 @@
-# Gold - The programming language
+# Gold - The Programming Language (Experimental & Research Purpose)
 
 <img src="assets/mascott.jpg" alt="CamCam the cameleon (not definitive)" width="300">
 
-Hello, first at all this language is made for fun and research purpose, you can use it if you want.
+Hello, Gold is currently under development and not intended for production use. It's primarily for learning and experimentation purposes.
 
-Gold is heavily inspired by Monkey from the books of Thorsten Ball. The first version of Gold will
-follow its guideline in "Writing An Interpreter In Go" and "Writing A Compiler In Go" plus some
-addition of myself. I will list my modification in change logs, thus after completed these books
-I will modify this language to my please, which also will be noted in the changes logs.
+## Language Overview:
 
-## Monkey base
+- Compiled language with a virtual machine
+- Object-oriented tendencies (work in progress)
+- Type safety with null protection
+- Recent strong focus on catching errors at compile time to minimize runtime issues
 
-Here's list of addition of my self
+With this repo, you can compile your code in Gold, run in the VM and even use a REPL.
 
-- '<=' and '>=' are classic comparator that return bool value
-- FLOAT are float64 and support operation between integer in float which will convert to float64 no matter the result
-- 'x++' and 'x--' return the value of the identifier then increment of decrement
-- '++x' and '--x' increment or decrement then return the value
-- while loop
-- null safety. keyword 'may' instead of 'let' to accept null value. Yeah there's no type check currently so null safety without type is weird, but whatever it's cool
+### Inspiration:
+Gold draws from Monkey, the language featured in Thorsten Ball's books "Writing An Interpreter In Go" and "Writing A Compiler In Go". While initially following its guidelines, Gold has evolved into a distinct language.
 
-## Known issue
+### More Information:
+A basic wiki is available below to guide you through Gold's core concepts. A more comprehensive wiki will be created when the language matures and resources permit.
 
-Function that return function don't exactly test the 
-Function returned by function must have the same arguments in case multiple can be sent
-`len` function can take any type for the compiler, only the VM will catch an error
-++x-- unknown behavior
+
+## Feature
+
+### Basics:
+
+- Standard arithmetic operators (+, -, /, *, ==, !=, >, <, <=, >=, !)
+- Prefix and postfix increment/decrement (++, --)
+- Primitive types: int, float, bool, string, array, dictionary
+- Type-based error checking during compilation
+- Automatic type conversions (e.g., int + float) when possible
+- Array and dictionary behavior similar to Python (can hold any types as keys or values)
+
+Here are some example :
+
+```
+let x = 0
+while (x++ < 10) {
+  print(x) // print all number from 1 to 10
+}
+
+[[1, 1, 1]][0][0] // will produce 1
+```
+
+There's also some built-in functions with obvious behavior : 
+- *print*
+- *len*
+- *push*
+- *first*
+- *last*
+
+### Typed Variables:
+
+The incorporation of typed properties and null safety is a pivotal aspect of the language, and I invested considerable effort in refining it during the development process. Here's how it works :
+
+- Explicit type declaration using keywords like *mint*, *lint*, *mstr*, *lstr*, *mflt*, *lflt*, *marr*, *larr*, *mdct*, *ldct*, *any*, *may*, and *let*.
+- *m* or *l* prefix indicates whether the value can be null (*may*) or must be non-null (*let*).
+- Use *let* or *may* without types to let the compiler infer the type.
+
+The most important part of it comes with functions.
+
+### Typed function
+
+The functions work like variable with small nuance. You will declare them the same way you declare a variable but the type is actually the type returned by the function. This is a particularly useful for high-order function or closure.
+
+
+** This will work
+```
+lint x = 0
+mint f = fn(mint a) {
+  if (5 > 2) {
+    return a
+  }
+}
+f(x)
+```
+** This will fail
+```
+lint x = 0
+mint f = fn(mstr a) {
+  if (5 > 2) {
+    return a
+  }
+}
+f(x)
+```
+
+### Everything Is an Expression (Work in Progress):
+
+*if* and *while* statements can potentially return values like functions (experimental feature).
+
+## Known Issues:
+
+*len* function: The compiler accepts any type, but the VM will catch errors.
+*++x--*: Unsupported (and unnecessary, who want to do that ?).
+
+## Usage 
+Given that this language is built on Go, you can easily initiate the REPL by running `go run main.go`. To compile a file named test.gold, use the command `go run main.go` compile test. This will generate a file named test.cold, which you can execute with `go run main.go run test`. Alternatively, you can simplify the installation of the language using go install (ensure that you add GOPATH to your PATH).
