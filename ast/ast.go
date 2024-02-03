@@ -83,16 +83,6 @@ func (ls *Declare) GetValue() Expression  { return ls.Value }
 func (ls *Declare) GetName() *Identifier  { return ls.Name }
 func (ls *Declare) GetToken() token.Token { return ls.Token }
 
-type (
-	AnyDeclare struct{ Declare }
-	LetDeclare struct{ Declare }
-	IntDeclare struct{ Declare }
-	FltDeclare struct{ Declare }
-	StrDeclare struct{ Declare }
-	ArrDeclare struct{ Declare }
-	DctDeclare struct{ Declare }
-)
-
 type ReassignStatement struct {
 	Value Expression
 	Name  *Identifier
@@ -362,9 +352,8 @@ func (fl *FunctionLiteral) String() string {
 }
 
 type Parameter struct {
-	Name     *Identifier
-	Token    token.Token // the token.LINT token
-	Nullable bool
+	Name  *Identifier
+	Token token.Token // the token.LINT token
 }
 
 func (pa *Parameter) expressionNode()      {}

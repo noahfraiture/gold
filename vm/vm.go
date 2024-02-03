@@ -50,7 +50,7 @@ func New(bytecode *compiler.Bytecode) *VM {
 	}
 }
 
-// NOTE : used in the repl to keep the stored value
+// used in the repl to keep the stored value
 func NewWithGlobalsStore(bytecode *compiler.Bytecode, s []object.Object) *VM {
 	vm := New(bytecode)
 	vm.globals = s

@@ -194,7 +194,7 @@ func TestResolveFree(t *testing.T) {
 	global.Define("b", object.Attribute{})
 
 	firstLocal := NewEnclosedSymbolTable(global)
-	firstLocal.Define("c", object.Attribute{}) // TODO : everything to true
+	firstLocal.Define("c", object.Attribute{})
 	firstLocal.Define("d", object.Attribute{})
 
 	secondLocal := NewEnclosedSymbolTable(firstLocal)

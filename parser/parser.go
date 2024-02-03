@@ -126,31 +126,15 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseReassignStatement()
 	}
 
-	var declareStmt *ast.Declare
 	curTokenType := p.curToken.Type
 	nullable, err := isNullable(curTokenType)
 	if err == nil {
-		declareStmt = p.parseDeclareStatement(nullable)
+		return p.parseDeclareStatement(nullable)
 	}
 
-	switch curTokenType {
-	case token.ANY:
-		return &ast.AnyDeclare{Declare: *declareStmt}
-	case token.MDCT, token.LDCT:
-		return &ast.DctDeclare{Declare: *declareStmt}
-	case token.MFLT, token.LFLT:
-		return &ast.FltDeclare{Declare: *declareStmt}
-	case token.MARR, token.LARR:
-		return &ast.ArrDeclare{Declare: *declareStmt}
-	case token.MSTR, token.LSTR:
-		return &ast.StrDeclare{Declare: *declareStmt}
-	case token.MINT, token.LINT:
-		return &ast.IntDeclare{Declare: *declareStmt}
-	case token.MAY, token.LET:
-		return &ast.LetDeclare{Declare: *declareStmt}
-	case token.RETURN:
+	if curTokenType == token.RETURN {
 		return p.parseReturnStatement()
-	default:
+	} else {
 		return p.parseExpressionStatement()
 	}
 }
@@ -518,11 +502,7 @@ func (p *Parser) parseFunctionParameters() []*ast.Parameter {
 
 	p.nextToken()
 
-	// NOTE : should I take care of nullable here or in compiler ? For now it's gonna be here
-
-	nullable, _ := isNullable(p.curToken.Type)
-
-	para := &ast.Parameter{Token: p.curToken, Nullable: nullable}
+	para := &ast.Parameter{Token: p.curToken}
 	p.nextToken()
 	para.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	parameters = append(parameters, para)
@@ -530,8 +510,7 @@ func (p *Parser) parseFunctionParameters() []*ast.Parameter {
 	for p.peekTokenIs(token.COMMA) {
 		p.nextToken()
 		p.nextToken()
-		nullable, _ := isNullable(p.curToken.Type)
-		para := &ast.Parameter{Token: p.curToken, Nullable: nullable}
+		para := &ast.Parameter{Token: p.curToken}
 		p.nextToken()
 		para.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 		parameters = append(parameters, para)

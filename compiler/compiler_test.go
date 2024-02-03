@@ -77,7 +77,7 @@ func TestCompilerScopes(t *testing.T) {
 func TestNumberArithmetic(t *testing.T) {
 	tests := []compilerTestCase{
 		{
-			input:             "1 + 2", // TODO : wrong order. Why
+			input:             "1 + 2",
 			expectedConstants: []interface{}{1, 2},
 			expectedInstructions: []code.Instructions{
 				code.Make(code.OpConstant, 0),
@@ -633,7 +633,7 @@ func TestGlobalReassign(t *testing.T) {
 			},
 		},
 		{
-			// TODO : even when use same constant, get different OpConstant code, could need opti
+			// NOTE : even when use same constant, get different OpConstant code, could need opti
 			input: `
       let one = 1;
       let two = 2;
@@ -863,7 +863,6 @@ func TestArrayLiterals(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
-// TODO : complete for floats and strings
 func TestHashLiterals(t *testing.T) {
 	tests := []compilerTestCase{
 		{
@@ -884,6 +883,24 @@ func TestHashLiterals(t *testing.T) {
 				code.Make(code.OpConstant, 3),
 				code.Make(code.OpConstant, 4),
 				code.Make(code.OpConstant, 5),
+				code.Make(code.OpHash, 6),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input:             `{"hey": 2, 3.0: {1:2}, 5: [1,2]}`,
+			expectedConstants: []interface{}{3.0, 1, 2, 5, 1, 2, "hey", 2},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpConstant, 1),
+				code.Make(code.OpConstant, 2),
+				code.Make(code.OpHash, 2),
+				code.Make(code.OpConstant, 3),
+				code.Make(code.OpConstant, 4),
+				code.Make(code.OpConstant, 5),
+				code.Make(code.OpArray, 2),
+				code.Make(code.OpConstant, 6),
+				code.Make(code.OpConstant, 7),
 				code.Make(code.OpHash, 6),
 				code.Make(code.OpPop),
 			},
@@ -1449,7 +1466,7 @@ func TestCallingFunctionsWithWrongArguments(t *testing.T) {
 }
 
 func TestWrongDeclarationExpression(t *testing.T) {
-	// TODO : more tests
+	// TEST : more tests
 	tests := []compilerTestError{
 		{
 			input:           `let x = null`,
@@ -1743,7 +1760,7 @@ func runCompilerTests(t *testing.T, tests []compilerTestCase) {
 		if err != nil {
 			t.Fatalf(`
 testConstants failed: %s
-orogram : %s
+program : %s
 bytecode: %s
         `, err, program.String(), bytecode)
 		}

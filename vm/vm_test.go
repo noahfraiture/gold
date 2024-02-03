@@ -186,7 +186,6 @@ func TestStringExpressions(t *testing.T) {
 	runVmTests(t, tests)
 }
 
-// TODO : ensure array can have everything
 func TestArrayLiterals(t *testing.T) {
 	tests := []vmTestCase{
 		{"[]", []int{}},

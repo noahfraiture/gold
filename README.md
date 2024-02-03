@@ -20,3 +20,9 @@ Here's list of addition of my self
 - while loop
 - null safety. keyword 'may' instead of 'let' to accept null value. Yeah there's no type check currently so null safety without type is weird, but whatever it's cool
 
+## Known issue
+
+Function that return function don't exactly test the 
+Function returned by function must have the same arguments in case multiple can be sent
+`len` function can take any type for the compiler, only the VM will catch an error
+++x-- unknown behavior

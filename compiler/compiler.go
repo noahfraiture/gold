@@ -21,7 +21,7 @@ func New() *Compiler {
 	mainScope := CompilationScope{
 		instructions:        code.Instructions{},
 		lastInstruction:     EmittedInstruction{},
-		previousInstruction: EmittedInstruction{}, // NOTE : to replace lastInstruction when we pop it, but is it really usefull ?
+		previousInstruction: EmittedInstruction{}, // to replace lastInstruction when we pop it, but is it really usefull ?
 	}
 
 	symbolTable := NewSymbolTable()
@@ -90,12 +90,12 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 
 				// We already had a returned value which is not a function
 				if infos.FunctionAttribute == nil {
-					return infos, fmt.Errorf("return function and not function") // TODO : better error message
+					return infos, errorTypeAndFunc(s.String(), infos.ObjectType)
 				}
 
 				// We already had a returned function but with different attributes
 				if !reflect.DeepEqual(infos.FunctionAttribute, tmpObjectAttribute.FunctionAttribute) {
-					return infos, fmt.Errorf("return function with different attributes")
+					return infos, errorDifferentFunc(s.String(), *infos.FunctionAttribute, *tmpObjectAttribute.FunctionAttribute)
 				}
 			} else {
 
@@ -434,7 +434,6 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		infos.ObjectType = object.STRING_OBJ
 
 	case *ast.ArrayLiteral:
-		// NOTE : currently allow nullable value without any trouble
 		for _, el := range node.Elements {
 			_, err = c.Compile(el)
 			if err != nil {
@@ -446,7 +445,6 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		infos.ObjectType = object.ARRAY_OBJ
 
 	case *ast.HashLiteral:
-		// NOTE : currently allow nullable value without any trouble
 		keys := []ast.Expression{}
 		for k := range node.Pairs {
 			keys = append(keys, k)
@@ -456,7 +454,6 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		})
 
 		for _, k := range keys {
-			// TODO : check nullable
 			_, err = c.Compile(k)
 			if err != nil {
 				return infos, err
@@ -470,49 +467,18 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		c.emit(code.OpHash, len(node.Pairs)*2)
 		infos.ObjectType = object.HASH_OBJ
 
-	// === DECLARE ===
-	case *ast.LetDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, "")
+		// === DECLARE ===
+	case *ast.Declare:
+		obType := objectType(node.Token.Type)
+		if node.Token.Type == "let" || node.Token.Type == "may" {
+			obType = ""
+		}
+
+		fmt.PrintobType)
+		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, obType)
 		if err != nil {
 			return infos, err
 		}
-
-	case *ast.AnyDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, object.ANY) // Will be nullable
-		if err != nil {
-			return infos, err
-		}
-
-	case *ast.IntDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, object.INTEGER_OBJ)
-		if err != nil {
-			return infos, err
-		}
-
-	case *ast.FltDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, object.FLOAT_OBJ)
-		if err != nil {
-			return infos, err
-		}
-
-	case *ast.StrDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, object.STRING_OBJ)
-		if err != nil {
-			return infos, err
-		}
-
-	case *ast.ArrDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, object.ARRAY_OBJ)
-		if err != nil {
-			return infos, err
-		}
-
-	case *ast.DctDeclare:
-		err := c.compileDeclare(node.Name.Value, node.Value, node.Nullable, object.HASH_OBJ)
-		if err != nil {
-			return infos, err
-		}
-
 	case *ast.ReassignStatement:
 		symbol, ok := c.symbolTable.Resolve(node.Name.Value)
 		if !ok {
@@ -623,15 +589,6 @@ func (c *Compiler) Compile(node ast.Node) (object.Attribute, error) {
 		c.emit(code.OpReturn)
 
 	case *ast.CallExpression:
-		// FIX : return the infos about the called function but should give infos about returned value
-		// of the function concerning the arguments
-		// I could change the behavior for Identifier but it should work for Identifier and FunctionLiteral
-		// Should modify the object.Attribute to accept information about the returned value separated from the function itself
-		//
-		// How to declare function that return function ? What should be the type ?
-		// It should be recursively the return type of embedded function
-		//
-		// If the returned value is a function, ObjectType=="" and instead store an Attribute
 		infos, err = c.Compile(node.Function) // Identifier or FunctionLiteral
 		if err != nil {
 			return infos, err
@@ -862,6 +819,14 @@ func errorType(name string, expected, got object.ObjectType) error {
 
 func errorArgumentCount(expected, got int) error {
 	return fmt.Errorf("wrong argument count : expect %d but got %d", expected, got)
+}
+
+func errorTypeAndFunc(name string, previousType object.ObjectType) error {
+	return fmt.Errorf("%s can return a function and %s", name, previousType)
+}
+
+func errorDifferentFunc(name string, previous, current object.Attribute) error {
+	return fmt.Errorf("%s return function with different definition previous=%v, current=%v", name, previous, current)
 }
 
 type Bytecode struct {

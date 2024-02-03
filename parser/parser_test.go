@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gold/ast"
 	"gold/lexer"
+	"gold/token"
 	"strings"
 	"testing"
 )
@@ -24,27 +25,27 @@ func TestDeclareStatements(t *testing.T) {
 		expectedIdentifier string
 		expectedValue      any
 		nullable           bool
-		explicitType       int
+		explicitType       token.TokenType
 	}{
-		{"let x = 5;", "x", 5, false, LET},
-		{"let y = true;", "y", true, false, LET},
-		{"let foobar = y;", "foobar", "y", false, LET},
-		{"may x = 5;", "x", 5, true, LET},
-		{"may y = true;", "y", true, true, LET},
-		{"may foobar = y;", "foobar", "y", true, LET},
-		{"mint x = 5;", "x", 5, true, INT},
-		{"lint x = 5;", "x", 5, false, INT},
-		{"endeavouros x = 5;", "x", 5, true, INT},
-		{"mflt x = 5.0;", "x", 5.0, true, FLOAT},
-		{"lflt x = 5.0;", "x", 5.0, false, FLOAT},
-		{"mstr x = 5", "x", 5, true, STR},
-		{"lstr x = 5", "x", 5, false, STR},
-		{`marr x = 5`, "x", 5, true, ARR},
-		{`larr x = 5`, "x", 5, false, ARR},
-		{`larry x = 5`, "x", 5, false, ARR},
-		{`mdct x = 5`, "x", 5, true, DCT},
-		{`ldct x = 5`, "x", 5, false, DCT},
-		{`any x = 5`, "x", 5, false, ANY},
+		{"let x = 5;", "x", 5, false, token.LET},
+		{"let y = true;", "y", true, false, token.LET},
+		{"let foobar = y;", "foobar", "y", false, token.LET},
+		{"may x = 5;", "x", 5, true, token.MAY},
+		{"may y = true;", "y", true, true, token.MAY},
+		{"may foobar = y;", "foobar", "y", true, token.MAY},
+		{"mint x = 5;", "x", 5, true, token.MINT},
+		{"lint x = 5;", "x", 5, false, token.LINT},
+		{"endeavouros x = 5;", "x", 5, true, token.MINT},
+		{"mflt x = 5.0;", "x", 5.0, true, token.MFLT},
+		{"lflt x = 5.0;", "x", 5.0, false, token.LFLT},
+		{"mstr x = 5", "x", 5, true, token.MSTR},
+		{"lstr x = 5", "x", 5, false, token.LSTR},
+		{`marr x = 5`, "x", 5, true, token.MARR},
+		{`larr x = 5`, "x", 5, false, token.LARR},
+		{`larry x = 5`, "x", 5, false, token.LARR},
+		{`mdct x = 5`, "x", 5, true, token.MDCT},
+		{`ldct x = 5`, "x", 5, false, token.LDCT},
+		{`any x = 5`, "x", 5, false, token.ANY},
 	}
 
 	for _, tt := range tests {
@@ -59,43 +60,17 @@ func TestDeclareStatements(t *testing.T) {
 
 		stmt := program.Statements[0]
 		declareKeyword := strings.Split(tt.input, " ")[0]
-		var val ast.Expression
-		switch tt.explicitType {
-		case LET:
-			if !testDeclare[*ast.LetDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
-				return
-			}
-			val = stmt.(*ast.LetDeclare).Value
-		case INT:
-			if !testDeclare[*ast.IntDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
-				return
-			}
-			val = stmt.(*ast.IntDeclare).Value
-		case FLOAT:
-			if !testDeclare[*ast.FltDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
-				return
-			}
-			val = stmt.(*ast.FltDeclare).Value
-		case STR:
-			if !testDeclare[*ast.StrDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
-				return
-			}
-			val = stmt.(*ast.StrDeclare).Value
-		case ARR:
-			if !testDeclare[*ast.ArrDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
-				return
-			}
-			val = stmt.(*ast.ArrDeclare).Value
-		case DCT:
-			if !testDeclare[*ast.DctDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
-				return
-			}
-			val = stmt.(*ast.DctDeclare).Value
-		case ANY:
-			if !testDeclare[*ast.AnyDeclare](t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
-				return
-			}
-			val = stmt.(*ast.AnyDeclare).Value
+		if !testDeclare(t, stmt, tt.expectedIdentifier, declareKeyword, tt.nullable) {
+			return
+		}
+		stmt, ok := stmt.(*ast.Declare)
+		if !ok {
+			t.Fatalf("statement is not a declareStmt but %T", stmt)
+		}
+		val := stmt.(*ast.Declare).Value
+		token := stmt.(*ast.Declare).Token.Type
+		if token != tt.explicitType {
+			t.Fatalf("wrong type, got=%s want=%s", tt.explicitType, token)
 		}
 
 		if !testLiteralExpression(t, val, tt.expectedValue) {
@@ -513,7 +488,6 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"++x * 5",
 			"((++x) * 5)",
 		},
-		// TODO : There was previously a test with --x++ but that doesn't make that much sense. Can correct later
 	}
 
 	for _, tt := range tests {
@@ -710,7 +684,6 @@ func TestIfElseExpression(t *testing.T) {
 	}
 }
 
-// NOTE : very similar with TestIfExpression and TestIfElseExpression
 func TestWhileExpression(t *testing.T) {
 	input := `while (x < y) { x }`
 
@@ -1208,9 +1181,9 @@ func TestFunctionLiteralWithName(t *testing.T) {
 			1, len(program.Statements))
 	}
 
-	stmt, ok := program.Statements[0].(*ast.LetDeclare)
+	stmt, ok := program.Statements[0].(*ast.Declare)
 	if !ok {
-		t.Fatalf("program.Statements[0] is not ast.LetStatement. got=%T",
+		t.Fatalf("program.Statements[0] is not ast.Declare. got=%T",
 			program.Statements[0])
 	}
 
@@ -1226,13 +1199,13 @@ func TestFunctionLiteralWithName(t *testing.T) {
 	}
 }
 
-func testDeclare[T ast.DeclareStatement](t *testing.T, s ast.Statement, name, keyword string, nullable bool) bool {
+func testDeclare(t *testing.T, s ast.Statement, name, keyword string, nullable bool) bool {
 	if s.TokenLiteral() != keyword {
 		t.Errorf("s.TokenLiteral not '%s'. got=%q", keyword, s.TokenLiteral())
 		return false
 	}
 
-	declareStmt, ok := s.(T)
+	declareStmt, ok := s.(*ast.Declare)
 	if !ok {
 		t.Errorf("s not keyword statement. got=%T", s)
 		return false
@@ -1328,8 +1301,8 @@ func testLiteralExpression(
 	exp ast.Expression,
 	expected interface{},
 ) bool {
-	// TODO : can't take care of string since identifier method is also a string and it's annoying
-	// TODO : take care of array and so
+	// TEST : can't take care of string since identifier method is also a string and it's annoying
+	// TEST : take care of array and so
 	switch v := expected.(type) {
 	case int:
 		return testIntegerLiteral(t, exp, int64(v))

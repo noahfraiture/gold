@@ -85,7 +85,7 @@ type Float struct {
 func (i *Float) Type() ObjectType { return FLOAT_OBJ }
 func (i *Float) Inspect() string  { return fmt.Sprintf("%f", i.Value) }
 func (i *Float) HashKey() HashKey {
-	return HashKey{Type: i.Type(), Value: uint64(i.Value)} // TODO : is it right way to hash float ?
+	return HashKey{Type: i.Type(), Value: uint64(i.Value)}
 }
 
 type Boolean struct {
